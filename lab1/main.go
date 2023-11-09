@@ -164,7 +164,7 @@ func PostHandler(connection net.Conn, requestSplit []string) {
 	// requessplit: [POST /files HTTP/1.1 Host: localhost:1122 User-Agent: curl/7.78.0 Accept: * Content-Length: 6916 Content-Type: multipart/form-data; boundary=------------------------c434da834ad240a8  ]
 	fileLocation := strings.Fields(requestSplit[0])[1] // Make sure post is trying to save in /files directory.
 	if fileLocation != "/files" {
-		errorHandler(connection, 400, "Bad Request", "Please save the file in /files and not in:"+fileLocation)
+		errorHandler(connection, 403, "Forbidden", "Please save the file in /files and not in:"+fileLocation)
 		return
 	}
 
