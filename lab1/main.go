@@ -68,6 +68,7 @@ func runServer(server serverSettings) {
 		connection, err := listener.Accept() // wait for a new connection
 		if err != nil {
 			log.Fatal(err)
+			continue
 		}
 
 		goRoutineLimit <- struct{}{} //limit to 10 concurrent using the channel and wait for
@@ -183,11 +184,13 @@ func PostHandler(connection net.Conn, requestSplit []string) {
 	}
 	if file == nil {
 		errorHandler(connection, 400, "Internal Server Error", "Empty file")
+		return
 
 	}
 	err = SaveFile(file)
 	if err != nil {
 		errorHandler(connection, 500, "Internal Server Error", "Couldn't save file, "+err.Error())
+		return
 
 	} else {
 		file.contentType = getContentType(file.extension)
