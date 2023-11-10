@@ -39,6 +39,7 @@ type serverSettings struct {
 }
 
 func main() {
+
 	server := configureServerSettings()
 	runServer(server)
 
@@ -47,15 +48,19 @@ func main() {
 func configureServerSettings() serverSettings {
 	var server serverSettings
 	server.maxGoRoutines = maxGoRoutines
-
-	fmt.Print("Enter port to listen to: ")
-	fmt.Scan(&server.port)
+	if len(os.Args) > 1 {
+		server.port = os.Args[1]
+	} else if server.port == "" {
+		fmt.Print("Enter port to listen to: ")
+		fmt.Scan(&server.port)
+	}
 	fmt.Println("Server is running on port ", server.port)
 
 	return server
 }
 
 func runServer(server serverSettings) {
+
 	listener, err := net.Listen("tcp", ":"+server.port)
 	if err != nil {
 		log.Fatal("Couldn't start the server:", err)
