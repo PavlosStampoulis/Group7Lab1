@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strings"
 )
 
@@ -17,9 +18,13 @@ type Message struct {
 
 func main() {
 	var port string
-	fmt.Printf("Enter port to run on: ")
-	fmt.Scan(&port)
-	fmt.Printf("\nRunning on port: %v", port)
+	if len(os.Args) > 1 {
+		port = os.Args[1]
+	} else if port == "" {
+		fmt.Print("Enter port to listen to: ")
+		fmt.Scan(&port)
+	}
+	fmt.Println("Server is running on port ", port)
 
 	ln, err := net.Listen("tcp", ":"+port)
 	if err != nil {
