@@ -5,18 +5,34 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"strings"
 )
 
 type Message struct {
-	request string
-	host    string
-	other   string
+	cli_conn net.Conn
+	request  string
+	host     string
+	other    string
+}
+
+var rq_methods = map[string]bool{
+	"GET":     true,
+	"POST":    false,
+	"HEAD":    false,
+	"PUT":     false,
+	"DELETE":  false,
+	"CONNECT": false,
+	"OPTIONS": false,
+	"TRACE":   false,
+	"PATCH":   false,
 }
 
 func main() {
+
+	//Start up server, if port not provided ask for it
 	var port string
 	if len(os.Args) > 1 {
 		port = os.Args[1]
@@ -27,14 +43,19 @@ func main() {
 	fmt.Println("Server is running on port ", port)
 
 	ln, err := net.Listen("tcp", ":"+port)
+
 	if err != nil {
-		fmt.Println("Error handling listen if")
+		log.Fatal("Couldn't start the server:", err)
 	}
+
 	defer ln.Close()
+
+	//Loop accepting new incomming connections, no preset max child processes
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			fmt.Println("Error handling in connection if")
+			log.Fatal("Error accepting connection ", err)
+			continue
 		}
 		go handleConnection(conn)
 	}
@@ -43,21 +64,35 @@ func main() {
 func handleConnection(cli_conn net.Conn) {
 	defer cli_conn.Close()
 
+	//read client request
 	buf := make([]byte, 1024)
 	buf_l, err := cli_conn.Read(buf)
 
 	if err != nil {
-		fmt.Println("Error handling in read client")
+		errorHandler(cli_conn, 500, "Internal Server Error", "Couldn't read data from the client: "+err.Error())
+		return
 	}
+	//extract and modify parts of the message to pass on to server
 	client_r := Message{}
-	client_r.extractMessage(buf, buf_l)
-	client_r.checkReqFormat()
+	client_r.cli_conn = cli_conn
+	if !client_r.extractMessage(buf, buf_l) {
+		return
+	}
+	if !client_r.checkReqFormat() {
+		return
+	}
+
+	//connect to the requested server
 	serv_conn, e := net.Dial("tcp", client_r.host)
 	if e != nil {
 		fmt.Println("Error handling in dial:" + client_r.host + ".")
+		//Not sure this is the correct message
+		errorHandler(cli_conn, 404, "Not Found", "Could not reach host: "+client_r.host)
+		return
 	}
 	defer serv_conn.Close()
 
+	//pass on request and forward reply
 	println("rq:" + client_r.request + client_r.other)
 	rq := []byte(client_r.request + client_r.other)
 	serv_conn.Write(rq)
@@ -65,18 +100,28 @@ func handleConnection(cli_conn net.Conn) {
 
 }
 
-func (client_r *Message) extractMessage(buf []byte, buf_l int) {
+func (client_r *Message) extractMessage(buf []byte, buf_l int) bool {
 	message := string(buf[:buf_l])
 	fmt.Print("\nrecieved:" + message + "\n")
 	ms_lines := strings.Split(message, "\r\n")
 	fmt.Print(ms_lines[:])
+	if len(ms_lines) < 2 {
+		errorHandler(client_r.cli_conn, 400, "Bad Request", "Badly formatted request")
+		return false
+	}
+	//vector to match header parts that might be included and need special interaction
 	h_to_edit := []string{"Proxy-Connection:", "Proxy-Authorization:"}
 
-	//might use things from other later:
+	//check header line by line
 	for inx, ln := range ms_lines {
 		if inx == 0 {
 			client_r.request = ln + "\r\n"
 		} else if inx == 1 {
+
+			if !strings.Contains(ln, "Host:") {
+				errorHandler(client_r.cli_conn, 400, "Bad Request", "Badly formatted request")
+				return false
+			}
 			client_r.host = strings.TrimSpace(strings.TrimLeft(strings.Clone(ln), "Host:"))
 		} else {
 			toAdd := true
@@ -99,27 +144,39 @@ func (client_r *Message) extractMessage(buf []byte, buf_l int) {
 	fmt.Printf("\nRequest " + client_r.request + "\n")
 	fmt.Printf("Host " + client_r.host + "\n")
 	fmt.Printf("Other " + client_r.other + "\n")
-
+	return true
 }
 
-func (client_r *Message) checkReqFormat() {
+func (client_r *Message) checkReqFormat() bool {
 	//check formatting of Request
 	request := strings.TrimSpace(client_r.request)
 	requestSplits := strings.Split(request, " ")
 	requestSplits[0] = strings.ToUpper(requestSplits[0])
-	if requestSplits[0] != "GET" {
-		fmt.Println("Error handling for non GET or format")
-		return
+	rq_imple, exist := rq_methods[requestSplits[0]]
+	if !exist {
+		errorHandler(client_r.cli_conn, 400, "Bad Request", "Badly formatted request")
+		return false
+	} else if !rq_imple {
+		errorHandler(client_r.cli_conn, 501, "Not Implemented", requestSplits[0]+" is not implemented")
+		return false
 	}
 	if requestSplits[2] != "HTTP/1.1" {
-		fmt.Println("Error handling for HTTP version or format")
-		return
+		fmt.Println(client_r.cli_conn, 505, "HTTP Version", "Not Supported")
+		return false
 	}
 
+	//check if host is in request row, if so remove
 	index := strings.Index(requestSplits[1], client_r.host)
 	if index != -1 {
 		requestSplits[1] = requestSplits[1][index+len(client_r.host):]
 	}
 
 	client_r.request = strings.Join(requestSplits, " ") + "\r\n"
+	return true
+}
+
+func errorHandler(connection net.Conn, httpStatus int, httpMsg string, serverMsg string) {
+	log.Println(serverMsg)
+	io.WriteString(connection, "HTTP/1.1 "+fmt.Sprintf("%d", httpStatus)+" "+httpMsg+"\r\nContent-Type: text/plain\r\n\r\n"+httpMsg)
+	//							version				400					   Bad Request									  Bad Request
 }
