@@ -85,15 +85,12 @@ func handleConnection(cli_conn net.Conn) {
 	//connect to the requested server
 	serv_conn, e := net.Dial("tcp", client_r.host)
 	if e != nil {
-		fmt.Println("Error handling in dial:" + client_r.host + ".")
-		//Not sure this is the correct message
 		errorHandler(cli_conn, 502, "Bad Gateway", "Could not reach host: "+client_r.host)
 		return
 	}
 	defer serv_conn.Close()
 
 	//pass on request and forward reply
-	println("rq:" + client_r.request + client_r.other)
 	rq := []byte(client_r.request + client_r.other)
 	_, err = serv_conn.Write(rq)
 	if err != nil {
@@ -106,10 +103,13 @@ func handleConnection(cli_conn net.Conn) {
 }
 
 func (client_r *Message) extractMessage(buf []byte, buf_l int) bool {
+
 	message := string(buf[:buf_l])
-	fmt.Print("\nrecieved:" + message + "\n")
+
+	//Splits the message into lines
 	ms_lines := strings.Split(message, "\r\n")
-	fmt.Print(ms_lines[:])
+
+	//So that we at least have GET and host.
 	if len(ms_lines) < 2 {
 		errorHandler(client_r.cli_conn, 400, "Bad Request", "Badly formatted request")
 		return false
@@ -139,16 +139,13 @@ func (client_r *Message) extractMessage(buf []byte, buf_l int) bool {
 				}
 			}
 			if toAdd {
-				fmt.Println(ln)
 				client_r.other = client_r.other + ln + "\r\n"
 			}
 
 		}
 
 	}
-	fmt.Printf("\nRequest " + client_r.request + "\n")
-	fmt.Printf("Host " + client_r.host + "\n")
-	fmt.Printf("Other " + client_r.other + "\n")
+
 	return true
 }
 
@@ -166,7 +163,7 @@ func (client_r *Message) checkReqFormat() bool {
 		return false
 	}
 	if requestSplits[2] != "HTTP/1.1" {
-		fmt.Println(client_r.cli_conn, 505, "HTTP Version", "Not Supported")
+		errorHandler(client_r.cli_conn, 505, "HTTP Version", "Not Supported")
 		return false
 	}
 
@@ -181,9 +178,7 @@ func (client_r *Message) checkReqFormat() bool {
 }
 
 func errorHandler(connection net.Conn, httpStatus int, httpMsg string, serverMsg string) {
-	//log.Println(fmt.Sprintf("%d ", httpStatus) + serverMsg)
-	test := "HTTP/1.1 " + fmt.Sprintf("%d", httpStatus) + " " + httpMsg + "\r\nContent-Type: text/plain\r\n\r\n" + httpMsg
-	println(test)
-	io.WriteString(connection, test)
+	log.Println(serverMsg)
+	io.WriteString(connection, "HTTP/1.1 "+fmt.Sprintf("%d", httpStatus)+" "+httpMsg+"\r\nContent-Type: text/plain\r\n\r\n"+httpMsg)
 	//							version				400					   Bad Request									  Bad Request
 }
