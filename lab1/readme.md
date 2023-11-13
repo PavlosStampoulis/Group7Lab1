@@ -20,8 +20,8 @@
 ` Git clone our local repository to the machines: git clone https://github.com/PavlosStampoulis/Group7Lab1.git 
 ` Go to the directory of main.go and respectively proxy.go on the two assigned machines.
 ` Then in order for the code to run without needing to have the terminal opened, we type this command in the terminal:
-`` nohup go run main.go > output.log 2>&1 &
-`` and respectively: nohup go run proxy.go > output.log 2>&1 &
+`` nohup go run main.go port > output.log 2>&1 &
+`` and respectively: nohup go run proxy.go port > output.log 2>&1 &
 ` Now both the server and proxy are up and running and any output can be checked with: cat output.log
 
 ## Others:
