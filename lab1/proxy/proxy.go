@@ -87,7 +87,7 @@ func handleConnection(cli_conn net.Conn) {
 	if e != nil {
 		fmt.Println("Error handling in dial:" + client_r.host + ".")
 		//Not sure this is the correct message
-		errorHandler(cli_conn, 404, "Not Found", "Could not reach host: "+client_r.host)
+		errorHandler(cli_conn, 502, "Bad Gateway", "Could not reach host: "+client_r.host)
 		return
 	}
 	defer serv_conn.Close()
@@ -95,7 +95,12 @@ func handleConnection(cli_conn net.Conn) {
 	//pass on request and forward reply
 	println("rq:" + client_r.request + client_r.other)
 	rq := []byte(client_r.request + client_r.other)
-	serv_conn.Write(rq)
+	_, err = serv_conn.Write(rq)
+	if err != nil {
+		errorHandler(cli_conn, 504, "Gateway Timeout", "Couldn't send request to host: "+err.Error())
+		return
+	}
+
 	io.Copy(cli_conn, serv_conn)
 
 }
@@ -176,7 +181,9 @@ func (client_r *Message) checkReqFormat() bool {
 }
 
 func errorHandler(connection net.Conn, httpStatus int, httpMsg string, serverMsg string) {
-	log.Println(serverMsg)
-	io.WriteString(connection, "HTTP/1.1 "+fmt.Sprintf("%d", httpStatus)+" "+httpMsg+"\r\nContent-Type: text/plain\r\n\r\n"+httpMsg)
+	//log.Println(fmt.Sprintf("%d ", httpStatus) + serverMsg)
+	test := "HTTP/1.1 " + fmt.Sprintf("%d", httpStatus) + " " + httpMsg + "\r\nContent-Type: text/plain\r\n\r\n" + httpMsg
+	println(test)
+	io.WriteString(connection, test)
 	//							version				400					   Bad Request									  Bad Request
 }
