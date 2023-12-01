@@ -27,12 +27,11 @@ const (
 )
 
 type Coordinator struct {
-	mu            sync.Mutex // avoid conflicts in concurrent programs.
-	nMap          int        // how many map tasks are left to be done
-	nReduce       int
-	mapTasks      []Task
-	reduceTasks   []Task
-	iFileLocation [][]string
+	mu          sync.Mutex // avoid conflicts in concurrent programs.
+	nMap        int        // how many map tasks are left to be done
+	nReduce     int
+	mapTasks    []Task
+	reduceTasks []Task
 }
 
 type Task struct {
@@ -48,7 +47,7 @@ type Task struct {
 
 func (c *Coordinator) GetNReduce(args *GetNReduceArgs, reply *GetNReduceReply) error {
 	c.mu.Lock()
-	defer c.mu.Unlock() //maybe no need to lock here!
+	defer c.mu.Unlock()
 	reply.NReduce = len(c.reduceTasks)
 
 	return nil
@@ -74,7 +73,6 @@ func (c *Coordinator) AskForTask(args *AskForTaskArgs, reply *AskForTaskReply) e
 			reply.TaskFile = c.reduceTasks[idx].file
 			reply.TaskType = c.reduceTasks[idx].Type
 			reply.TaskId = c.reduceTasks[idx].index
-			reply.ReqFilesLoc = c.iFileLocation
 			return nil
 		}
 	} else {
@@ -117,18 +115,16 @@ func (c *Coordinator) WorkerReportsTaskDone(args *WorkerReportsTaskDoneArgs, rep
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if (args.TaskType) == MapTask {
-		if c.mapTasks[args.TaskId].status != Done {
-			c.mapTasks[args.TaskId].status = Done
-			c.iFileLocation[args.TaskId] = append(c.iFileLocation[args.TaskId], strconv.Itoa(args.WorkerId))
+		task := &c.mapTasks[args.TaskId]
+		if task.status != Done {
+			task.status = Done
 			c.nMap -= 1
-		} else {
-			c.iFileLocation[args.TaskId] = append(c.iFileLocation[args.TaskId], strconv.Itoa(args.WorkerId))
 		}
 
-	} else if (args.TaskType) == ReduceTask {
-
-		if c.reduceTasks[args.TaskId].status != Done {
-			c.reduceTasks[args.TaskId].status = Done
+	} else {
+		task := &c.reduceTasks[args.TaskId]
+		if task.status != Done {
+			task.status = Done
 			c.nReduce -= 1
 		}
 
@@ -148,7 +144,10 @@ func (c *Coordinator) timer() {
 				if c.mapTasks[idx].status == Executing {
 					c.mapTasks[idx].timeStamp -= 1
 					if c.mapTasks[idx].timeStamp == 0 {
-						c.mapTasks[idx].status = Unbegun
+						if c.mapTasks[idx].status != Done {
+							c.mapTasks[idx].status = Unbegun
+							c.mapTasks[idx].workerId = -1
+						}
 					}
 				}
 			}
@@ -157,18 +156,18 @@ func (c *Coordinator) timer() {
 				if c.reduceTasks[idx].status == Executing {
 					c.reduceTasks[idx].timeStamp -= 1
 					if c.reduceTasks[idx].timeStamp == 0 {
-						c.reduceTasks[idx].status = Unbegun
+						if c.reduceTasks[idx].status != Done {
+							c.reduceTasks[idx].status = Unbegun
+							c.reduceTasks[idx].workerId = -1
+						}
+
 					}
 				}
 			}
 		}
 		c.mu.Unlock()
 	}
-}
 
-func (c *Coordinator) WorkerLooksForFile(args *WorkerLooksForFileArgs, reply *WorkerLooksForFileReply) error {
-
-	return nil
 }
 
 // start a thread that listens for RPCs from worker.go
@@ -191,8 +190,8 @@ func (c *Coordinator) server() {
 func (c *Coordinator) Done() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	done := (c.nMap == 0 && c.nReduce == 0)
-	return done
+
+	return (c.nMap == 0 && c.nReduce == 0)
 }
 
 // create a Coordinator.

@@ -20,7 +20,6 @@ type GetNReduceArgs struct {
 }
 
 type GetNReduceReply struct {
-	MapNr   int
 	NReduce int
 }
 
@@ -28,10 +27,9 @@ type AskForTaskArgs struct {
 	WorkerId int
 }
 type AskForTaskReply struct {
-	TaskId      int
-	TaskFile    string
-	TaskType    TaskType
-	ReqFilesLoc [][]string
+	TaskId   int
+	TaskFile string
+	TaskType TaskType
 }
 
 type WorkerReportsTaskDoneArgs struct {
@@ -40,13 +38,6 @@ type WorkerReportsTaskDoneArgs struct {
 	TaskId   int
 }
 type WorkerReportsTaskDoneReply struct {
-}
-
-type WorkerLooksForFileArgs struct {
-	ReqFiles []string
-}
-type WorkerLooksForFileReply struct {
-	ReqFilesLoc [][]string
 }
 
 // Add your RPC definitions here.

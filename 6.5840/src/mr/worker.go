@@ -6,7 +6,6 @@ import (
 	"hash/fnv"
 	"io"
 	"log"
-	"net/http"
 	"net/rpc"
 	"os"
 	"sort"
@@ -29,10 +28,6 @@ func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
 
 var nReduce int
-var mapNr int
-var tmpDir string
-var handledMap map[string]bool
-var myId string
 
 // use ihash(key) % NReduce to choose the reduce
 // task number for each KeyValue emitted by Map.
@@ -47,17 +42,9 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 	//println("I started")
 	//send RPC to coordinator asking for a task
 	// get reduce count from master
-	nReduceAns, mapNrAns, ok := getNReduce()
+	nReduceAns, ok := getNReduce()
 	okHandler(ok, "Couldn't get nReduce from coordinator")
 	nReduce = nReduceAns
-	mapNr = mapNrAns //to know how many files to expect in reduce
-	dir, err := os.MkdirTemp(".", "")
-	tmpDir = dir
-	if err != nil {
-		log.Println("error creating folder ", err)
-	}
-	go fileSender()
-
 	for {
 		taskReply, ok := askForTask()
 		okHandler(ok, "Couldn't get task from coordinator")
@@ -65,7 +52,6 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 		case MapTask:
 			mapHandler(taskReply.TaskFile, mapf, taskReply.TaskId)
 		case ReduceTask:
-			reduceGetFiles(taskReply.TaskFile, taskReply.ReqFilesLoc)
 			reduceHandler(taskReply.TaskFile, reducef, taskReply.TaskId)
 		case ExitTask: // shuts down worker
 			log.Println("Worker got ExitTask, quiting worker.")
@@ -77,82 +63,6 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 
 	}
 
-}
-
-func fileSender() {
-	http.HandleFunc("/", fileSendHandler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-func fileSendHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == "GET" {
-		splitR := strings.Split(req.URL.Path, "/")
-		filename := splitR[len(splitR)-1]
-
-		files, err := os.ReadDir(tmpDir)
-		if err != nil {
-			log.Println("Error reading directory")
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		for _, file := range files {
-			if file.Name() == filename {
-				http.ServeFile(w, req, tmpDir+"/"+filename)
-				return
-			}
-
-		}
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	w.WriteHeader(http.StatusForbidden)
-}
-
-func reduceGetFiles(fileEnding string, fileLocations [][]string) {
-	for i := 0; i < mapNr; i++ {
-		_, handledMap := handledMap[strconv.Itoa(i)]
-		if !handledMap {
-			file := "mri-" + strconv.Itoa(i) + "-" + fileEnding + ".txt"
-			for _, id := range fileLocations[i] {
-				ok := askForFile(file, id)
-				if ok {
-					break
-				}
-			}
-		}
-	}
-	//add check to see all files are there
-}
-
-func askForFile(file string, id string) bool {
-
-	tmpFile, err := os.CreateTemp(tmpDir+"/", "")
-	if err != nil {
-		log.Println("Error creating file", err)
-		return false
-	}
-	resp, err := http.Get(id + "/" + file)
-	if err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-		log.Println(err)
-		return false
-	}
-	_, err = io.Copy(tmpFile, resp.Body)
-	if err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-		log.Println("Error copying file", err)
-		return false
-	}
-	tmpFile.Close()
-	err = os.Rename(tmpFile.Name(), tmpDir+"/"+file)
-	if err != nil {
-		log.Println("Error renaming", err)
-		return false
-	}
-
-	return true
 }
 
 func mapHandler(filePath string, mapf func(string, string) []KeyValue, taskId int) {
@@ -172,6 +82,7 @@ func mapHandler(filePath string, mapf func(string, string) []KeyValue, taskId in
 		log.Println("Error closing file", err)
 		return
 	}
+
 	//Create intermediate files
 	kv := mapf(filePath, string(fileContent))
 	// Write ihash values to the local file
@@ -188,30 +99,28 @@ func mapHandler(filePath string, mapf func(string, string) []KeyValue, taskId in
 	}
 	for i, content := range toFile {
 		mrfilename := "mri-" + strconv.Itoa(taskId) + "-" + strconv.Itoa(i) + ".txt"
-		tmpfile, err := os.CreateTemp(tmpDir+"/", "")
+		tmpfile, err := os.CreateTemp(".", "")
 		if err != nil {
 			log.Println(err)
 		}
-
 		for _, text := range content {
 			tmpfile.WriteString(text)
 		}
 		tmpfile.Close()
-		fmt.Println(tmpfile.Name())
-		err = os.Rename(tmpfile.Name(), tmpDir+"/"+mrfilename)
+		err = os.Rename(tmpfile.Name(), "./"+mrfilename)
 		if err != nil {
 			log.Println("Error renaming", err)
 			return
 		}
 	}
-	handledMap[strconv.Itoa(taskId)] = true
+
 	WorkerReportsTaskDone(taskId, MapTask)
 }
 
 func reduceHandler(filePath string, reducef func(string, []string) string, taskId int) {
 	//mr-X-Y.txt
 
-	buckets, err := os.ReadDir(tmpDir)
+	buckets, err := os.ReadDir(".")
 	//errorHandler(err,"Error reading folder")
 	if err != nil { // Handle the error if the folder read fails
 		log.Println("Error reading folder:", err)
@@ -232,7 +141,7 @@ func reduceHandler(filePath string, reducef func(string, []string) string, taskI
 			continue
 		}
 		if bucket_nr == filePath {
-			file, err := os.Open(tmpDir + "/" + bucket_f.Name())
+			file, err := os.Open(bucket_f.Name())
 			if err != nil { // Handle the error if the open fails
 				log.Println("Error opening file:", err)
 				return
@@ -270,7 +179,7 @@ func reduceHandler(filePath string, reducef func(string, []string) string, taskI
 	sort.Sort(ByKey(intermediate))
 	oname := "mr-out-" + filePath + ".txt"
 
-	ofile, err := os.CreateTemp(tmpDir, "")
+	ofile, err := os.CreateTemp(".", "")
 	if err != nil {
 		log.Println("Error creating file:", err)
 		return
@@ -301,20 +210,16 @@ func reduceHandler(filePath string, reducef func(string, []string) string, taskI
 	}
 	ofile.Close()
 
-	err = os.Rename(ofile.Name(), tmpDir+"/"+oname)
-	if err != nil {
-		log.Println("Error renaming", err)
-		return
-	}
+	err = os.Rename(ofile.Name(), "./"+oname)
 	WorkerReportsTaskDone(taskId, ReduceTask)
 }
 
-func getNReduce() (int, int, bool) {
+func getNReduce() (int, bool) {
 	args := GetNReduceArgs{}
 	reply := GetNReduceReply{}
 	ok := call("Coordinator.GetNReduce", &args, &reply)
 
-	return reply.NReduce, reply.MapNr, ok
+	return reply.NReduce, ok
 }
 
 func askForTask() (*AskForTaskReply, bool) {
@@ -334,13 +239,11 @@ func WorkerReportsTaskDone(taskId int, taskType TaskType) bool {
 	return ok
 }
 
-func WorkerLooksForFile(files []string) bool {
-	args := WorkerLooksForFileArgs{files}
-	reply := WorkerLooksForFileReply{}
-	ok := call("Coordinator.WorkerLooksForFile", &args, &reply)
-	return ok
+func errorHandler(err error, desc string) {
+	if err != nil {
+		log.Println(desc, " ", err)
+	}
 }
-
 func okHandler(didWork bool, errorDesc string) {
 	if !didWork {
 		log.Println(errorDesc)
