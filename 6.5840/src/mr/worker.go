@@ -66,58 +66,59 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 }
 
 func mapHandler(filePath string, mapf func(string, string) []KeyValue, taskId int) {
-    // Read fileContent
-    file, err := os.Open(filePath)
-    if err != nil {
-        log.Println("Error opening file", err)
-        return
-    }
-    fileContent, err := io.ReadAll(file)
-    if err != nil {
-        log.Println("Error reading file", err)
-        return
-    }
-    err = file.Close()
-    if err != nil {
-        log.Println("Error closing file", err)
-        return
-    }
+	// Read fileContent
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Println("Error opening file", err)
+		return
+	}
+	fileContent, err := io.ReadAll(file)
+	if err != nil {
+		log.Println("Error reading file", err)
+		return
+	}
+	err = file.Close()
+	if err != nil {
+		log.Println("Error closing file", err)
+		return
+	}
 
-    // Create intermediate files
-    kv := mapf(filePath, string(fileContent))
+	// Create intermediate files
+	kv := mapf(filePath, string(fileContent))
 
-    // Making a temporary folder to store intermediate results
-    toFile := make([][]string, nReduce)
-    for _, keyv := range kv {
-        Y := ihash(keyv.Key) % nReduce
-        toFile[Y] = append(toFile[Y], string(keyv.Key)+":"+string(keyv.Value)+"\n")
-    }
+	// Specify the desired directory
+	outputDirectory := "/mnt/efs/fs1"
 
-    // Specify the desired directory
-    outputDirectory := "/mnt/efs/fs1"
+	// Making a temporary folder to store intermediate results
+	toFile := make([][]string, nReduce)
+	for _, keyv := range kv {
+		Y := ihash(keyv.Key) % nReduce
+		toFile[Y] = append(toFile[Y], string(keyv.Key)+":"+string(keyv.Value)+"\n")
+	}
 
-    for i, content := range toFile {
-        mrfilename := fmt.Sprintf("%s/mri-%d-%d.txt", outputDirectory, taskId, i)
-        tmpfile, err := os.CreateTemp(outputDirectory, "")
-        if err != nil {
-            log.Println(err)
-            return
-        }
-        for _, text := range content {
-            tmpfile.WriteString(text)
-        }
-        tmpfile.Close()
+	for i, content := range toFile {
+		mrfilename := fmt.Sprintf("%s/mri-%d-%d.txt", outputDirectory, taskId, i)
+		tmpfile, err := os.CreateTemp(outputDirectory, "")
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		for _, text := range content {
+			tmpfile.WriteString(text)
+		}
+		tmpfile.Close()
 
-        // Move the temporary file to the final location
-        err = os.Rename(tmpfile.Name(), mrfilename)
-        if err != nil {
-            log.Println("Error renaming", err)
-            return
-        }
-    }
+		// Move the temporary file to the final location
+		err = os.Rename(tmpfile.Name(), mrfilename)
+		if err != nil {
+			log.Println("Error renaming", err)
+			return
+		}
+	}
 
-    WorkerReportsTaskDone(taskId, MapTask)
+	WorkerReportsTaskDone(taskId, MapTask)
 }
+
 
 func reduceHandler(filePath string, reducef func(string, []string) string, taskId int) {
 	//mr-X-Y.txt
