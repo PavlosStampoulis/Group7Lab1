@@ -257,7 +257,7 @@ func okHandler(didWork bool, errorDesc string) {
 // usually returns true.
 // returns false if something goes wrong.
 func call(rpcname string, args interface{}, reply interface{}) bool {
-	c, err := rpc.DialHTTP("tcp", "54.242.105.243"+":20796")
+	c, err := rpc.DialHTTP("tcp", "54.242.105.243"+":1234")
 	//sockname := coordinatorSock()
 	//c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
