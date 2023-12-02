@@ -86,7 +86,7 @@ func mapHandler(filePath string, mapf func(string, string) []KeyValue, taskId in
 	kv := mapf(filePath, string(fileContent))
 
 	// Specify the desired directory
-	outputDirectory := "/mnt/efs/fs1"
+	outputDirectory := "/home/ec2-user/fs1"
 
 	// Making a temporary folder to store intermediate results
 	toFile := make([][]string, nReduce)
@@ -122,7 +122,7 @@ func mapHandler(filePath string, mapf func(string, string) []KeyValue, taskId in
 func reduceHandler(filePath string, reducef func(string, []string) string, taskId int) {
 	//mr-X-Y.txt
 
-	buckets, err := os.ReadDir("/mnt/efs/fs1")
+	buckets, err := os.ReadDir("/home/ec2-user/fs1")
 	//errorHandler(err,"Error reading folder")
 	if err != nil { // Handle the error if the folder read fails
 		log.Println("Error reading folder:", err)
@@ -181,7 +181,7 @@ func reduceHandler(filePath string, reducef func(string, []string) string, taskI
 	sort.Sort(ByKey(intermediate))
 	oname := "mr-out-" + filePath + ".txt"
 
-	ofile, err := os.CreateTemp("/mnt/efs/fs1", "")
+	ofile, err := os.CreateTemp("/home/ec2-user/fs1", "")
 	if err != nil {
 		log.Println("Error creating file:", err)
 		return
@@ -212,7 +212,7 @@ func reduceHandler(filePath string, reducef func(string, []string) string, taskI
 	}
 	ofile.Close()
 
-	err = os.Rename(ofile.Name(), "/mnt/efs/fs1/"+oname)
+	err = os.Rename(ofile.Name(), "/home/ec2-user/fs1"+oname)
 	WorkerReportsTaskDone(taskId, ReduceTask)
 }
 
