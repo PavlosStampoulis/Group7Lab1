@@ -143,7 +143,7 @@ func reduceHandler(filePath string, reducef func(string, []string) string, taskI
 			continue
 		}
 		if bucket_nr == filePath {
-			file, err := os.Open(bucket_f.Name())
+			file, err := os.Open("/home/ec2-user/fs1/"+bucket_f.Name())
 			if err != nil { // Handle the error if the open fails
 				log.Println("Error opening file:", err)
 				return
