@@ -212,7 +212,7 @@ func reduceHandler(filePath string, reducef func(string, []string) string, taskI
 	}
 	ofile.Close()
 
-	err = os.Rename("/home/ec2-user/fs1/"+ofile.Name(), "/home/ec2-user/fs1"+oname)
+	err = os.Rename("/home/ec2-user/fs1/"+ofile.Name(), "/home/ec2-user/fs1/"+oname)
 	WorkerReportsTaskDone(taskId, ReduceTask)
 }
 
