@@ -14,8 +14,8 @@ type Key string
 type NodeAddress string
 
 /*type fingerEntry struct {
-	Id [] byte
-	Adress 	NodeAddress
+	ChordRingAdress [] byte
+	Adress 	NodeAddress		adress of node or file itself
 }*/
 
 type Node struct {
@@ -51,8 +51,9 @@ func NewNode(args *Arguments) *Node {
 	node.predecessor = ""
 	node.Bucket = make(map[*big.Int]string)
 	node.initSuccessors()
+	node.initFingerTable()
 
-	node.server()
+	//TODO: create folders for node
 
 	return node
 }
@@ -64,17 +65,24 @@ func (node *Node) initSuccessors() {
 }
 
 func (node *Node) initFingerTable() {
-	
+	//TODO: add chordringadresses
+	node.fingerTable[0] = node.address
+	for i := 1; i < fingerTableSize+1; i++ {
+		node.fingerTable[i] = node.address
+	}
 }
 
-
-func (n *Node) Create() {
-
+// Make predecessor empty and point all successors to self
+func (node *Node) CreateChord() {
+	node.predecessor = NodeAddress("")
+	for i := 0; i < len(node.successors); i++ {
+		node.successors[i] = node.address
+	}
 	//fingertable set itself
-	n.fingerTable[0] = NodeAddress(n.address)
+	//n.fingerTable[0] = NodeAddress(n.address)
 
 	//successor equal to itself
-	n.successors[0] = NodeAddress(n.address)
+	//n.successors[0] = NodeAddress(n.address)
 
 }
 
@@ -85,19 +93,19 @@ func (n *Node) join(args *Arguments) {
 }
 
 // stabilize: This function is periodically used to check the immediate successor and notify it about this node
-func stabilize(node Node) {
-	//Ask your current successor who their predecessor is, and get their successor table
-	//if you are not the predecessor anymore notify this new successor and update your predeccessor
-	//if your succesor doesn't reply truncate it from your list, if the list then is empty make yourself successor
-	args := PredecessorCall{}
+//func stabilize(node Node) {
+//Ask your current successor who their predecessor is, and get their successor table
+//if you are not the predecessor anymore notify this new successor and update your predeccessor
+//if your succesor doesn't reply truncate it from your list, if the list then is empty make yourself successor
+/*	args := PredecessorCall{}
 	reply := PredecessorResponse{}
-	err := call(string(node.successors[0]), "functions.Predecessor", &args, &reply) 
-	if (reply == node.address)
+	err := call(string(node.successors[0]), "functions.Predecessor", &args, &reply)
+	if reply == node.address {
+	}
 
 	//TODO
-	
 
-}
+}*/
 
 // Notify: This function is used when another node says it might be the predecessor of this node
 func (n *Node) Notify(np string) {

@@ -129,8 +129,13 @@ func (args *Arguments) ValidateArgs(userInput []string) bool {
 				args.Identifier = userInput[i]
 			}
 
-			validIdentifier, err := regexp.MatchString("[0-9a-fA-F]*", userInput[i])
-			if !validIdentifier || err != nil {
+			validIdentifierRegex, err := regexp.Compile("[0-9a-fA-F]*")
+			if err != nil {
+				fmt.Println("Error compiling regex:", err)
+				return false
+			}
+			validIdentifier := validIdentifierRegex.MatchString(userInput[i])
+			if !validIdentifier {
 				fmt.Printf("Invalid Identifier (Please match [0-9a-fA-F]): %s", userInput[i])
 				return false
 			}
@@ -225,10 +230,11 @@ func (n *Node) Ping(args *PingArgs, reply *PingReply) error {
 	return nil
 }
 
+/* todo rename
 func (n *Node) Predeccessor(args *PredecessorCall, reply *PredecessorResponse) error {
 
 	reply.predecessor = n.predecessor
 	reply.successors_successors = n.successors
 
 	return nil
-}
+}*/
