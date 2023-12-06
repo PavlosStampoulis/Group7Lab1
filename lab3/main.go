@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"lab3/dlab"
+	"net/rpc"
 	"time"
 )
 
@@ -12,7 +13,7 @@ func main() {
 
 	node := dlab.NewNode(Arguments)
 
-	//Todo: Handle connections
+	rpc.Register(node) // now we can call using the node
 	node.Server()
 
 	if Arguments.JoinIpAdress != "" && Arguments.JoinPort != 0 { //Join existing chord ring
@@ -26,16 +27,11 @@ func main() {
 
 	//TODO: start timers (FixFingers, Stabilize, CheckPredecesor)
 
-	//Read userinput
-	exit := false
 	fmt.Println("\nCommands: Ping (IP) (PORT), Lookup [???], StoreFile [???], PrintState, Quit")
-	for !exit {
+	for {
 		node.ParseCommand()
 
 		time.Sleep(time.Millisecond)
 	}
-
-	// Make sure hand-off gets done to not lose content before
-	// the node decides to exit */
 
 }

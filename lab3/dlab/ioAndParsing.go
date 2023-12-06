@@ -54,15 +54,17 @@ func ReadLine() []string {
 func (n *Node) ParseCommand() {
 	commandLine := ReadLine()
 	switch commandLine[0] {
+	case "help", "Help":
+		fmt.Println("\nCommands: Ping (IP) (PORT), Lookup [???], StoreFile [???], PrintState, Quit ")
 	case "Quit", "quit", "exit", "Exit":
 		fmt.Println("\nMoving data to successor: " + n.successors[0])
-		//TODO: move to successor
+		//TODO: move everything to successor
 		fmt.Println("\nTerminating Node")
 		os.Exit(0)
 	case "Lookup":
 	case "StoreFile":
 	case "PrintState":
-	case "":
+		n.printState()
 	case "Ping":
 		if len(commandLine) != 3 {
 			fmt.Println("Invalid Ping format, use format \"Ping (IP) (PORT)\"")
@@ -229,4 +231,9 @@ func validateInterval(intervalStr string, upperIntervalLimit int64) (int64, erro
 	}
 	return 0, err
 
+}
+
+func (node *Node) printState() {
+	fmt.Println("\n Printing state for node: " + node.Name)
+	//TODO: print eveything
 }
