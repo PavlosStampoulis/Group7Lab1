@@ -55,6 +55,29 @@ func ReadLine() []string {
 	return splitUserInput
 }
 
+func (n *Node) ParseCommand() {
+	commandLine := ReadLine()
+	switch commandLine[0] {
+	case "exit":
+	case "Lookup":
+	case "StoreFile":
+	case "PrintState":
+	case "":
+	case "Ping":
+		args := PingArgs{}
+		reply := PingReply{}
+		err := call(commandLine[1], "functions.Ping", &args, &reply) // "functions.Ping" might need to be changed
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println("Pinged")
+	default:
+		fmt.Printf("Invalid command: %s", commandLine[0])
+
+	}
+
+}
+
 func (args *Arguments) ValidateArgs(userInput []string) bool {
 	for i := 0; i < len(userInput); i++ {
 		switch userInput[i] {

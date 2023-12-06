@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"lab3/dlab"
-	"strings"
 	"time"
 )
 
@@ -20,8 +19,7 @@ func main() {
 	exit := false
 	for !exit {
 		time.Sleep(time.Millisecond)
-		command := dlab.ReadLine()
-		println(strings.Join(command, " "))
+		node.ParseCommand()
 	}
 
 	// Make sure hand-off gets done to not lose content before
