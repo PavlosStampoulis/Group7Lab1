@@ -29,17 +29,13 @@ type Arguments struct {
 
 func ReadArgsConfigureChord() *Arguments {
 	var args *Arguments
-	var userInput string
 
 	fmt.Println("Usage: chord -a (IP) -p (PORT) [--ja (JOINIP) --jp (JOINPORT)] --ts (STABILIZEINTERVAL) --tff (FIXFINGERSINTERVAL) --tcp (CHECKPREDECESSORINTERVAL) -r (NUMSUCCESSORS) [-i (IDENTIFIER)]")
 	fmt.Println("Examples:")
-	fmt.Println("Start a new ring: chord -a 128.8.126.63 -p 4170 --ts 30000 --tff 10000 --tcp 30000 -r 4")
+	fmt.Println("Start a new ring: chord -a 192.168.1.7 -p 4170 --ts 30000 --tff 10000 --tcp 30000 -r 4")
 	fmt.Println("Join existing Chord ring: chord -a 128.8.126.63 -p 4171 --ja 128.8.126.63 --jp 4170 --ts 30000 --tff 10000 --tcp 30000 -r 4")
 
-	reader := bufio.NewReader(os.Stdin)
-	userInput, _ = reader.ReadString('\n')
-	userInput = strings.TrimSpace(userInput)
-	splitUserInput := strings.Fields(userInput)
+	splitUserInput := ReadLine()
 	args = &Arguments{}
 	if !args.ValidateArgs(splitUserInput) {
 		log.Fatal("Incorret input!")
@@ -47,6 +43,16 @@ func ReadArgsConfigureChord() *Arguments {
 	}
 	return args
 
+}
+
+func ReadLine() []string {
+	var userInput string
+	fmt.Print("$ ")
+	reader := bufio.NewReader(os.Stdin)
+	userInput, _ = reader.ReadString('\n')
+	userInput = strings.TrimSpace(userInput)
+	splitUserInput := strings.Fields(userInput)
+	return splitUserInput
 }
 
 func (args *Arguments) ValidateArgs(userInput []string) bool {
