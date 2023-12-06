@@ -2,22 +2,26 @@ package main
 
 import (
 	"fmt"
+	"lab3/dlab"
+	"time"
 )
 
 func main() {
-	Arguments := ReadArgsConfigureChord()
+
+	Arguments := dlab.ReadArgsConfigureChord()
 	fmt.Printf("%+v\n", Arguments)
 
-	node := NewNode(Arguments)
+	node := dlab.NewNode(Arguments)
 	fmt.Printf("New node created: %+v\n", node)
-
-	node.server()
 	//Todo: Handle connections
 
-	if Arguments.JoinIpAdress != "" && Arguments.JoinPort != 0 {
-		//config.JoinExistingChord() //TODO: :D
-		//join()
-	} else { // Create a new chord ring
-		node.CreateChord()
+	//temporary
+	exit := false
+	for !exit {
+		time.Sleep(time.Second)
 	}
+
+	// Make sure hand-off gets done to not lose content before
+	// the node decides to exit
+
 }

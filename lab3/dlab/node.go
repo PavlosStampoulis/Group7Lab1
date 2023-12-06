@@ -1,4 +1,4 @@
-package main
+package dlab
 
 import (
 	"fmt"
@@ -54,6 +54,14 @@ func NewNode(args *Arguments) *Node {
 	node.initFingerTable()
 
 	//TODO: create folders for node
+	node.server()
+
+	if args.JoinIpAdress != "" && args.JoinPort != 0 {
+		//config.JoinExistingChord() //TODO: :D
+		//join()
+	} else { // Create a new chord ring
+		node.CreateChord()
+	}
 
 	return node
 }
