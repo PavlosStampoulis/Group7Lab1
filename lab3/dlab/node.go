@@ -38,7 +38,7 @@ func NewNode(args *Arguments) *Node {
 	node := &Node{}
 	var nodeName string
 	//TODO: Check if ip = localhost
-	node.address = NodeAddress(fmt.Sprintf("IP: %s, Port: %d", args.IpAdress, args.Port))
+	node.address = NodeAddress(fmt.Sprintf("%s:%d", args.IpAdress, args.Port))
 	if args.Identifier == "NodeAdress" {
 		nodeName = string(node.address)
 	} else {
