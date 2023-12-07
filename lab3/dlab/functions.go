@@ -23,9 +23,7 @@ func (n *Node) Server() {
 	rpc.Register(n)
 	rpc.HandleHTTP()
 	l, e := net.Listen("tcp", string(n.address))
-	//sockname := coordinatorSock()
-	//os.Remove(sockname)
-	//l, e := net.Listen("unix", sockname)
+
 	if e != nil {
 		log.Fatal("listen error:", e)
 	}
@@ -43,4 +41,14 @@ func getLocalAddress() string {
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
 	return localAddr.IP.String()
+}
+
+func between(startN NodeAddress, eltN NodeAddress, end *big.Int, inclusive bool) bool {
+	start := hashString(string(startN))
+	elt := hashString(string(eltN))
+	if end.Cmp(start) > 0 {
+		return (start.Cmp(elt) < 0 && elt.Cmp(end) < 0) || (inclusive && elt.Cmp(end) == 0)
+	} else {
+		return start.Cmp(elt) < 0 || elt.Cmp(end) < 0 || (inclusive && elt.Cmp(end) == 0)
+	}
 }

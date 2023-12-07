@@ -233,7 +233,11 @@ func validateInterval(intervalStr string, upperIntervalLimit int64) (int64, erro
 
 }
 
-func (node *Node) printState() {
-	fmt.Println("\n Printing state for node: " + node.Name)
+func (n *Node) printState() {
+	fmt.Println("\n Printing state for node: " + n.Name)
+	for i, node := range n.successors {
+		fmt.Printf("Successor nr %d: %s\n", i, string(node))
+	}
+	fmt.Println("Predecessor: ", n.predecessor)
 	//TODO: print eveything
 }

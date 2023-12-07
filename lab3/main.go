@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+// chord -a 192.168.56.1 -p 4170 --ts 30000 --tff 10000 --tcp 30000 -r 4
+// chord -a 192.168.56.1 -p 4173 --ja 192.168.56.1 --jp 4170 --ts 30000 --tff 10000 --tcp 30000 -r 4
+// Ping 192.168.56.1 4170
+
 func main() {
 
 	Arguments := dlab.ReadArgsConfigureChord()

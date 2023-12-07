@@ -10,12 +10,14 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
 var m = 6
 var fingerTableSize = 6                                                  // = m
 var hashMod = new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(m)), nil) // 2^m
+var maxSteps = 35
 
 type Key string
 type NodeAddress string
@@ -244,7 +246,7 @@ Tree structure:
 
 func (node *Node) initSuccessors() {
 	for i := 0; i < len(node.successors); i++ {
-		node.successors[i] = ""
+		node.successors[i] = node.address
 	}
 }
 
@@ -271,6 +273,14 @@ func (node *Node) CreateChord() {
 }
 
 func (n *Node) Join(args *Arguments) error {
+	askN := NodeAddress(args.JoinIpAdress + ":" + strconv.FormatInt(args.JoinPort, 10))
+	joinN, err := find(n.address, askN)
+	if err != nil {
+		fmt.Println("Failed to find place for " + n.address)
+	}
+	fmt.Println("Told to join " + joinN)
+	n.successors[0] = joinN
+	n.Notify(joinN)
 	//n.findSuccessor(args.JoinIpAdress + ":" + strconv.FormatInt(args.JoinPort, 10))
 	return nil
 }
@@ -327,7 +337,7 @@ func removeElement(slice []NodeAddress, index int) []NodeAddress {
 
 // Notify: notify a node to tell we think we're their predecessor
 func (n *Node) Notify(np NodeAddress) {
-	args := NotifyArgs{}
+	args := NotifyArgs{n.address}
 	reply := NotifyReply{}
 	err := call(string(np), "Node.NotifyReceiver", &args, &reply)
 	if err != nil {
@@ -337,15 +347,9 @@ func (n *Node) Notify(np NodeAddress) {
 
 }
 
-func findSuccessor() NodeAddress {
-
-	finger := NodeAddress("") //TODO implement here or in fix fingers, currently placeholder
-	return finger
-}
-
 // fixFingers: Periodically called to update/confirm part of the finger table (not all entries at once)
 func (n *Node) fixFingers() {
-	n.fingerTable[n.next] = findSuccessor() //TODO placeholder
+	//n.fingerTable[n.next] = findSuccessor() //TODO placeholder
 	//keep a global variable of "next entry to check" and increment it as this is periodically run
 	n.next = (n.next + 1) % len(n.fingerTable)
 
@@ -359,4 +363,49 @@ func (n *Node) checkPredecessor() {
 	if err != nil {
 		n.predecessor = ""
 	}
+}
+
+// closestPredecessor: check your finger table to find the node closest before id
+// if finger table not initiated, return yourself and don't run the rest
+func (n *Node) closestPredecessor(id NodeAddress) NodeAddress {
+	if n.fingerTable[0] == n.address {
+		return n.address
+	}
+	closestPre := n.address
+	idHash := hashString(string(id))
+	for _, node := range n.fingerTable {
+		nodeHash := hashString(string(node))
+		x := nodeHash.CmpAbs(idHash)
+		if x == -1 {
+			closestPre = node
+		} else if x == 0 {
+			return closestPre
+		}
+	}
+	return closestPre
+}
+
+// find succesor of id, iterative local version (makes use of RPC version)
+func find(id NodeAddress, start NodeAddress) (NodeAddress, error) {
+	fmt.Println("in find :=31")
+	found, nextNode := false, start
+	var err error
+	for i := 0; i < maxSteps; i++ {
+		args := FindSuccessorArgs{id}
+		reply := FindSuccessorReply{}
+		err = call(string(nextNode), "Node.FindSuccessor", &args, &reply)
+		if err != nil {
+			fmt.Println("Error searching for " + id)
+		}
+		found = reply.Found
+		if found {
+			return reply.RetAddress, err
+		}
+
+		if nextNode == reply.RetAddress { //no more successors to check through
+			return reply.RetAddress, nil
+		}
+		nextNode = reply.RetAddress
+	}
+	return NodeAddress(""), err
 }
