@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var m = 6
@@ -261,9 +262,9 @@ func (node *Node) initFingerTable() {
 // Make predecessor empty and point all successors to self
 func (node *Node) CreateChord() {
 	node.predecessor = NodeAddress("")
-	for i := 0; i < len(node.successors); i++ {
-		node.successors[i] = node.address
-	}
+	node.initSuccessors()
+	node.initFingerTable()
+	go node.timedCalls()
 	//fingertable set itself
 	//n.fingerTable[0] = NodeAddress(n.address)
 
@@ -281,54 +282,69 @@ func (n *Node) Join(args *Arguments) error {
 	fmt.Println("Told to join " + joinN)
 	n.successors[0] = joinN
 	n.Notify(joinN)
+	go n.timedCalls()
 	//n.findSuccessor(args.JoinIpAdress + ":" + strconv.FormatInt(args.JoinPort, 10))
 	return nil
 }
 
+func (n *Node) timedCalls() {
+	for {
+		n.stabilize()
+		time.Sleep(300 * time.Millisecond)
+		n.fixFingers()
+		time.Sleep(300 * time.Millisecond)
+		n.checkPredecessor()
+		time.Sleep(300 * time.Millisecond)
+	}
+}
+
 // stabilize: This function is periodically used to check the immediate successor and notify it about this node
-func stabilize(node Node) {
+func (n *Node) stabilize() {
+	if n.successors[0] == n.address {
+		return
+	}
 	//Ask your current successor who their predecessor is, and get their successor table
 	//if you are not the predecessor anymore notify this new successor and update your successer
 	//if your succesor doesn't reply truncate it from your list, if the list then is empty make yourself successor
 	args := StabilizeCall{}
 	reply := StabilizeResponse{}
-	err := call(string(node.successors[0]), "Node.StabilizeData", &args, &reply)
+	err := call(string(n.successors[0]), "Node.StabilizeData", &args, &reply)
 	if err != nil {
-		if len(node.successors) > 0 {
-			node.successors = node.successors[1:]
+		if len(n.successors) > 0 {
+			n.successors = n.successors[1:]
 		} else {
-			node.successors[0] = node.address
+			n.successors[0] = n.address
 		}
 	}
 
 	copy := []NodeAddress{}
-	if reply.predecessor == node.address {
-		if len(reply.successors_successors) == int(reply.numberofsuccessors) {
-			copy = reply.successors_successors[:len(reply.successors_successors)-1]
-			oneelement := []NodeAddress{reply.address}
+	if reply.Predecessor == n.address {
+		if len(reply.Successors_successors) == int(reply.Numberofsuccessors) {
+			copy = reply.Successors_successors[:len(reply.Successors_successors)-1]
+			oneelement := []NodeAddress{reply.Address}
 			copy = append(oneelement, copy...)
 		} else {
-			oneelement := []NodeAddress{reply.address}
-			copy = append(oneelement, reply.successors_successors...)
+			oneelement := []NodeAddress{reply.Address}
+			copy = append(oneelement, reply.Successors_successors...)
 		}
 	} else {
-		if len(reply.successors_successors) == (int(reply.numberofsuccessors)) {
-			copy = reply.successors_successors[:len(reply.successors_successors)-2]
-			oneelement := []NodeAddress{reply.predecessor, reply.address}
+		if len(reply.Successors_successors) == (int(reply.Numberofsuccessors)) {
+			copy = reply.Successors_successors[:len(reply.Successors_successors)-2]
+			oneelement := []NodeAddress{reply.Predecessor, reply.Address}
 			copy = append(oneelement, copy...)
-		} else if len(reply.successors_successors) == (int(reply.numberofsuccessors) - 1) {
-			copy = reply.successors_successors[:len(reply.successors_successors)-1]
-			oneelement := []NodeAddress{reply.predecessor, reply.address}
-			copy = append(oneelement, reply.successors_successors...)
+		} else if len(reply.Successors_successors) == (int(reply.Numberofsuccessors) - 1) {
+			copy = reply.Successors_successors[:len(reply.Successors_successors)-1]
+			oneelement := []NodeAddress{reply.Predecessor, reply.Address}
+			copy = append(oneelement, reply.Successors_successors...)
 		} else {
-			oneelement := []NodeAddress{reply.predecessor, reply.address}
-			copy = append(oneelement, reply.successors_successors...)
+			oneelement := []NodeAddress{reply.Predecessor, reply.Address}
+			copy = append(oneelement, reply.Successors_successors...)
 		}
 	}
 
-	node.successors = copy
+	n.successors = copy
 
-	node.Notify(node.successors[0])
+	n.Notify(n.successors[0])
 
 }
 func removeElement(slice []NodeAddress, index int) []NodeAddress {
@@ -357,6 +373,9 @@ func (n *Node) fixFingers() {
 
 // checkPredecessor: This function should occasionally be called to check if the current predecessor is alive
 func (n *Node) checkPredecessor() {
+	if n.predecessor == "" || n.predecessor == n.address {
+		return
+	}
 	args := PingArgs{}
 	reply := PingReply{}
 	err := call(string(n.predecessor), "Node.Ping", &args, &reply)

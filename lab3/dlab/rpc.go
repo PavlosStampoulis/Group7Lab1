@@ -18,10 +18,10 @@ type StabilizeCall struct {
 
 // Response from stabilize data
 type StabilizeResponse struct {
-	numberofsuccessors    int64
-	address               NodeAddress
-	predecessor           NodeAddress
-	successors_successors []NodeAddress
+	Numberofsuccessors    int64
+	Address               NodeAddress
+	Predecessor           NodeAddress
+	Successors_successors []NodeAddress
 }
 
 type NotifyArgs struct {

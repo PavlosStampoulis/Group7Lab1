@@ -70,6 +70,7 @@ func (n *Node) ParseCommand() {
 			fmt.Println("Invalid Ping format, use format \"Ping (IP) (PORT)\"")
 			return
 		}
+		fmt.Println("Ping! :D")
 		args := PingArgs{}
 		reply := PingReply{}
 		ok := isValidIp(commandLine[1])

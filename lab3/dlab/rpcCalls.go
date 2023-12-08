@@ -25,7 +25,7 @@ func call(address string, method string, args interface{}, reply interface{}) er
 }
 
 func (n *Node) Ping(args *PingArgs, reply *PingReply) error {
-	fmt.Println("Ping! :D")
+
 	return nil
 }
 
@@ -39,7 +39,6 @@ func (n *Node) getNumberSuccessors(args *NumberSuccessorsCall, reply *NumberSucc
 
 // NotifyReceiver: recieve notification from node believing to be our Predecessor
 func (n *Node) NotifyReceiver(args *NotifyArgs, reply *NotifyReply) error {
-	fmt.Println("At notify reciever")
 	if (n.predecessor == "") || between(n.predecessor, args.Address, n.Id, true) {
 		fmt.Println("should set predecessor, ", args.Address)
 		n.predecessor = args.Address
@@ -53,16 +52,15 @@ func (n *Node) NotifyReceiver(args *NotifyArgs, reply *NotifyReply) error {
 
 func (n *Node) StabilizeData(args *StabilizeCall, reply *StabilizeResponse) error {
 
-	reply.numberofsuccessors = globalNumberSuccessors
-	reply.address = n.address
-	reply.predecessor = n.predecessor
-	reply.successors_successors = n.successors
+	reply.Numberofsuccessors = globalNumberSuccessors
+	reply.Address = n.address
+	reply.Predecessor = n.predecessor
+	reply.Successors_successors = n.successors
 
 	return nil
 }
 
 func (n *Node) FindSuccessor(args *FindSuccessorArgs, reply *FindSuccessorReply) error {
-	fmt.Println("At Find")
 	for _, node := range n.successors {
 		if node == args.Id {
 			reply.Found = true
