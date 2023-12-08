@@ -373,7 +373,7 @@ func (n *Node) fixFingers() {
 
 // checkPredecessor: This function should occasionally be called to check if the current predecessor is alive
 func (n *Node) checkPredecessor() {
-	if n.predecessor == "" || n.predecessor == n.address {
+	if n.predecessor == "" {
 		return
 	}
 	args := PingArgs{}

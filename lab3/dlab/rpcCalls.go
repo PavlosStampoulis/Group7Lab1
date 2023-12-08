@@ -11,7 +11,7 @@ func call(address string, method string, args interface{}, reply interface{}) er
 	//sockname := coordinatorSock()
 	//c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
-		log.Fatal("dialing:", err)
+		log.Println("dialing:", err)
 	}
 	defer c.Close()
 
