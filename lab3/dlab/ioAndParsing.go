@@ -29,7 +29,7 @@ func ReadArgsConfigureChord() *Arguments {
 	fmt.Println("Usage: chord -a (IP) -p (PORT) [--ja (JOINIP) --jp (JOINPORT)] --ts (STABILIZEINTERVAL) --tff (FIXFINGERSINTERVAL) --tcp (CHECKPREDECESSORINTERVAL) -r (NUMSUCCESSORS) [-i (IDENTIFIER)]")
 	fmt.Println("Examples:")
 	fmt.Println("Start a new ring: chord -a 192.168.56.1 -p 4170 --ts 30000 --tff 10000 --tcp 30000 -r 4")
-	fmt.Println("Join existing Chord ring: chord -a 128.8.126.63 -p 4171 --ja 128.8.126.63 --jp 4170 --ts 30000 --tff 10000 --tcp 30000 -r 4")
+	fmt.Println("Join existing Chord ring: chord -a  192.168.56.1 -p 4171 --ja  192.168.56.1 --jp 4170 --ts 30000 --tff 10000 --tcp 30000 -r 4")
 
 	splitUserInput := ReadLine()
 	args = &Arguments{}
@@ -52,35 +52,65 @@ func ReadLine() []string {
 }
 
 func (n *Node) ParseCommand() {
+	reader := bufio.NewReader(os.Stdin)
 	commandLine := ReadLine()
 	switch commandLine[0] {
 	case "help", "Help":
 		fmt.Println("\nCommands: Ping (IP) (PORT), Lookup [???], StoreFile [???], PrintState, Quit ")
+
 	case "Quit", "quit", "exit", "Exit":
 		fmt.Println("\nMoving data to successor: " + n.successors[0])
-		//TODO: move everything to successor
+		//TODO: call(string(n.successors[0]), "MoveAll", n.Bucket, &struct{}{})
 		fmt.Println("\nTerminating Node")
 		os.Exit(0)
-	case "Lookup":
-	case "StoreFile":
-	case "PrintState":
-		n.printState()
-	case "Ping":
-		if len(commandLine) != 3 {
-			fmt.Println("Invalid Ping format, use format \"Ping (IP) (PORT)\"")
-			return
+
+	case "GET", "get", "Get":
+		fmt.Print("Enter the name of the file you want to get: ")
+		fileName, _ := reader.ReadString('\n')
+		fileName = strings.TrimSpace(fileName)
+		err := GetFile(fileName, n)
+		if err != nil {
+			fmt.Println("Couldnt get file, ", err)
 		}
-		fmt.Println("Ping! :D")
+		fmt.Println("Get file done!")
+
+	case "Lookup", "lookup": //Finds who has a specific key
+		if len(commandLine) != 2 {
+			fmt.Print("Enter the key to lookup: ")
+			keyToFind, _ := reader.ReadString('\n')
+			fmt.Println(keyToFind)
+			Lookup(keyToFind, n)
+		}
+	case "StoreFile", "storefile":
+		fmt.Println("Enter name of file to store:")
+		fileName, _ := reader.ReadString('\n')
+		err := FindAndstoreFile(fileName, n)
+		if err != nil {
+			fmt.Print(err)
+		}
+		fmt.Println("Store file done! \n")
+
+	case "PrintState", "printstate":
+		n.printState()
+
+	case "Ping", "ping":
+		if len(commandLine) != 3 {
+			fmt.Print("Enter IP: ")
+			ip, _ := reader.ReadString('\n')
+			fmt.Print("Enter port: ")
+			port, _ := reader.ReadString('\n')
+			commandLine = append(commandLine, ip, port)
+		}
 		args := PingArgs{}
-		reply := PingReply{}
+		reply := PongReply{}
 		ok := isValidIp(commandLine[1])
 		if !ok {
-			fmt.Printf("Invalid IP: %s", commandLine[1])
+			fmt.Printf("Invalid IP: %s\n", commandLine[1])
 			return
 		}
 		_, err := validatePort(commandLine[2])
 		if err != nil {
-			fmt.Printf("Invalid Port: %s", commandLine[2])
+			fmt.Printf("Invalid Port: %s\n", commandLine[2])
 			return
 		}
 		err = call(commandLine[1]+":"+commandLine[2], "Node.Ping", &args, &reply)
@@ -89,6 +119,7 @@ func (n *Node) ParseCommand() {
 			return
 		}
 		fmt.Println("Pong! :D")
+
 	default:
 		fmt.Println("\nCommands: Ping (IP) (PORT), Lookup [???], StoreFile [???], PrintState, Quit ")
 	}
@@ -167,7 +198,6 @@ func (args *Arguments) ValidateArgs(userInput []string) bool {
 				fmt.Printf("Invalid number of successors: %s\n", userInput[i])
 				return false
 			}
-			globalNumberSuccessors = NumPredecessor
 			args.NumSuccessors = NumPredecessor
 
 		case "-i":
@@ -235,10 +265,24 @@ func validateInterval(intervalStr string, upperIntervalLimit int64) (int64, erro
 }
 
 func (n *Node) printState() {
-	fmt.Println("\n Printing state for node: " + n.Name)
-	for i, node := range n.successors {
-		fmt.Printf("Successor nr %d: %s\n", i, string(node))
-	}
+	fmt.Println("\n\n Printing state for node: " + n.Name)
+	fmt.Println("Adress: ", n.address)
 	fmt.Println("Predecessor: ", n.predecessor)
-	//TODO: print eveything
+	fmt.Println("Identifier: ", n.Id)
+
+	fmt.Println("Node's successors:")
+	for i, node := range n.successors {
+		fmt.Println("Successor nr %d: %s\n", i, string(node))
+	}
+
+	fmt.Println("Node's Finger Table:")
+	for i, entr := range n.fingerTable {
+		fmt.Println("Finger %d:     Adress: %s", i, entr)
+	}
+
+	fmt.Println("Node's Buecket:")
+	for key, val := range n.Bucket {
+		fmt.Println("Key: %d , Value: %s", key, val)
+	}
+
 }

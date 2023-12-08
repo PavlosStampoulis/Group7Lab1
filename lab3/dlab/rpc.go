@@ -1,8 +1,10 @@
 package dlab
 
+import "math/big"
+
 type PingArgs struct {
 }
-type PingReply struct {
+type PongReply struct {
 }
 
 /*
@@ -18,7 +20,6 @@ type StabilizeCall struct {
 
 // Response from stabilize data
 type StabilizeResponse struct {
-	Numberofsuccessors    int64
 	Address               NodeAddress
 	Predecessor           NodeAddress
 	Successors_successors []NodeAddress
@@ -33,10 +34,21 @@ type NotifyReply struct {
 }
 
 type FindSuccessorArgs struct {
-	Id NodeAddress
+	Id *big.Int
 }
 
 type FindSuccessorReply struct {
 	Found      bool
 	RetAddress NodeAddress
+}
+
+type File struct {
+	Name    string
+	Id      *big.Int
+	Content []byte
+}
+
+type StoreFileReply struct {
+	Succeeded bool
+	Error     error
 }

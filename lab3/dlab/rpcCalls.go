@@ -3,6 +3,7 @@ package dlab
 import (
 	"fmt"
 	"log"
+	"math/big"
 	"net/rpc"
 )
 
@@ -12,6 +13,7 @@ func call(address string, method string, args interface{}, reply interface{}) er
 	//c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
 		log.Println("dialing:", err)
+		return err
 	}
 	defer c.Close()
 
@@ -24,7 +26,7 @@ func call(address string, method string, args interface{}, reply interface{}) er
 	return err
 }
 
-func (n *Node) Ping(args *PingArgs, reply *PingReply) error {
+func (n *Node) Ping(args *PingArgs, reply *PongReply) error {
 
 	return nil
 }
@@ -52,7 +54,6 @@ func (n *Node) NotifyReceiver(args *NotifyArgs, reply *NotifyReply) error {
 
 func (n *Node) StabilizeData(args *StabilizeCall, reply *StabilizeResponse) error {
 
-	reply.Numberofsuccessors = globalNumberSuccessors
 	reply.Address = n.address
 	reply.Predecessor = n.predecessor
 	reply.Successors_successors = n.successors
@@ -61,10 +62,10 @@ func (n *Node) StabilizeData(args *StabilizeCall, reply *StabilizeResponse) erro
 }
 
 func (n *Node) FindSuccessor(args *FindSuccessorArgs, reply *FindSuccessorReply) error {
-	for _, node := range n.successors {
-		if node == args.Id {
+	for i, node := range n.successors {
+		if hashString(string(node)).Cmp(args.Id) == 0 && i < len(n.successors)-1 {
 			reply.Found = true
-			reply.RetAddress = node
+			reply.RetAddress = n.successors[i+1]
 			return nil
 		}
 	}
@@ -72,3 +73,24 @@ func (n *Node) FindSuccessor(args *FindSuccessorArgs, reply *FindSuccessorReply)
 	reply.RetAddress = n.closestPredecessor(args.Id)
 	return nil
 }
+
+// inserts key, vals into active node
+// Moves nodes data before a node shut down
+func (n *Node) MoveAll(bucket map[*big.Int]string, emptyReply *struct{}) error {
+	for key, val := range bucket {
+		n.Bucket[key] = val
+	}
+	return nil
+}
+
+/*func (n *Node) DoMoveAll(adress string, empty *struct{}) error {
+	tempBucket := make(map[*big.Int]string)
+	for key, val := range n.Bucket {
+		if between((n.predecessor[0]), (key) {
+
+		}
+	}
+
+	call(adress, "MoveAll")
+	return nil
+}*/

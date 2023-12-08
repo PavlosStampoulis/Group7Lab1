@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -263,8 +264,8 @@ func (node *Node) initFingerTable() {
 func (node *Node) CreateChord() {
 	node.predecessor = NodeAddress("")
 	node.initSuccessors()
-	node.initFingerTable()
-	go node.timedCalls()
+	//node.initFingerTable()
+	//go node.timedCalls()
 	//fingertable set itself
 	//n.fingerTable[0] = NodeAddress(n.address)
 
@@ -275,19 +276,19 @@ func (node *Node) CreateChord() {
 
 func (n *Node) Join(args *Arguments) error {
 	askN := NodeAddress(args.JoinIpAdress + ":" + strconv.FormatInt(args.JoinPort, 10))
-	joinN, err := find(n.address, askN)
+	joinN, err := find(n.Id, askN)
 	if err != nil {
 		fmt.Println("Failed to find place for " + n.address)
 	}
 	fmt.Println("Told to join " + joinN)
 	n.successors[0] = joinN
 	n.Notify(joinN)
-	go n.timedCalls()
+	//go n.timedCalls()
 	//n.findSuccessor(args.JoinIpAdress + ":" + strconv.FormatInt(args.JoinPort, 10))
 	return nil
 }
 
-func (n *Node) timedCalls() {
+func (n *Node) TimedCalls() {
 	for {
 		n.stabilize()
 		time.Sleep(300 * time.Millisecond)
@@ -301,8 +302,12 @@ func (n *Node) timedCalls() {
 // stabilize: This function is periodically used to check the immediate successor and notify it about this node
 func (n *Node) stabilize() {
 	if n.successors[0] == n.address {
+		if n.predecessor != "" {
+			n.successors[0] = n.predecessor
+		}
 		return
 	}
+
 	//Ask your current successor who their predecessor is, and get their successor table
 	//if you are not the predecessor anymore notify this new successor and update your successer
 	//if your succesor doesn't reply truncate it from your list, if the list then is empty make yourself successor
@@ -310,45 +315,25 @@ func (n *Node) stabilize() {
 	reply := StabilizeResponse{}
 	err := call(string(n.successors[0]), "Node.StabilizeData", &args, &reply)
 	if err != nil {
-		if len(n.successors) > 0 {
-			n.successors = n.successors[1:]
+		n.successors = append(n.successors[1:], n.address)
+	} else if reply.Predecessor == n.address {
+		if cap(n.successors) <= len(reply.Successors_successors) {
+			n.successors = append(n.successors[:1], reply.Successors_successors[:cap(n.successors)-1]...)
 		} else {
-			n.successors[0] = n.address
-		}
-	}
-
-	copy := []NodeAddress{}
-	if reply.Predecessor == n.address {
-		if len(reply.Successors_successors) == int(reply.Numberofsuccessors) {
-			copy = reply.Successors_successors[:len(reply.Successors_successors)-1]
-			oneelement := []NodeAddress{reply.Address}
-			copy = append(oneelement, copy...)
-		} else {
-			oneelement := []NodeAddress{reply.Address}
-			copy = append(oneelement, reply.Successors_successors...)
+			n.successors = append(n.successors[:1], reply.Successors_successors...)
 		}
 	} else {
-		if len(reply.Successors_successors) == (int(reply.Numberofsuccessors)) {
-			copy = reply.Successors_successors[:len(reply.Successors_successors)-2]
-			oneelement := []NodeAddress{reply.Predecessor, reply.Address}
-			copy = append(oneelement, copy...)
-		} else if len(reply.Successors_successors) == (int(reply.Numberofsuccessors) - 1) {
-			copy = reply.Successors_successors[:len(reply.Successors_successors)-1]
-			oneelement := []NodeAddress{reply.Predecessor, reply.Address}
-			copy = append(oneelement, reply.Successors_successors...)
+		n.successors[1] = n.successors[0]
+		n.successors[0] = reply.Predecessor
+		if len(reply.Successors_successors) <= cap(reply.Successors_successors)-1 {
+			n.successors = append(n.successors[:2], reply.Successors_successors[:cap(n.successors)-2]...)
 		} else {
-			oneelement := []NodeAddress{reply.Predecessor, reply.Address}
-			copy = append(oneelement, reply.Successors_successors...)
+			n.successors = append(n.successors[:2], reply.Successors_successors...)
 		}
 	}
-
-	n.successors = copy
 
 	n.Notify(n.successors[0])
 
-}
-func removeElement(slice []NodeAddress, index int) []NodeAddress {
-	return append(slice[:index], slice[index+1:]...)
 }
 
 // Notify: notify a node to tell we think we're their predecessor
@@ -365,7 +350,19 @@ func (n *Node) Notify(np NodeAddress) {
 
 // fixFingers: Periodically called to update/confirm part of the finger table (not all entries at once)
 func (n *Node) fixFingers() {
-	//n.fingerTable[n.next] = findSuccessor() //TODO placeholder
+
+	exp := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(n.next-1)), nil)
+	sum := new(big.Int).Add(n.Id, exp)
+	fingerID := new(big.Int).Mod(sum, hashMod)
+	args := FindSuccessorArgs{hashString(fingerID.String())}
+	reply := FindSuccessorReply{}
+	err := call(string(n.fingerTable[n.next]), "Node.FindSuccessor", &args, &reply)
+	if err != nil {
+		fmt.Println("Error finger searching for " + fingerID.String())
+	}
+	n.fingerTable[n.next] = reply.RetAddress
+
+	//n.fingerTable[n.next] = findSuccessor() //TODO placeholder Klar ovanför tror jag
 	//keep a global variable of "next entry to check" and increment it as this is periodically run
 	n.next = (n.next + 1) % len(n.fingerTable)
 
@@ -377,7 +374,7 @@ func (n *Node) checkPredecessor() {
 		return
 	}
 	args := PingArgs{}
-	reply := PingReply{}
+	reply := PongReply{}
 	err := call(string(n.predecessor), "Node.Ping", &args, &reply)
 	if err != nil {
 		n.predecessor = ""
@@ -386,15 +383,14 @@ func (n *Node) checkPredecessor() {
 
 // closestPredecessor: check your finger table to find the node closest before id
 // if finger table not initiated, return yourself and don't run the rest
-func (n *Node) closestPredecessor(id NodeAddress) NodeAddress {
+func (n *Node) closestPredecessor(id *big.Int) NodeAddress {
 	if n.fingerTable[0] == n.address {
-		return n.address
+		return n.successors[0]
 	}
 	closestPre := n.address
-	idHash := hashString(string(id))
 	for _, node := range n.fingerTable {
 		nodeHash := hashString(string(node))
-		x := nodeHash.CmpAbs(idHash)
+		x := nodeHash.Cmp(id)
 		if x == -1 {
 			closestPre = node
 		} else if x == 0 {
@@ -405,8 +401,7 @@ func (n *Node) closestPredecessor(id NodeAddress) NodeAddress {
 }
 
 // find succesor of id, iterative local version (makes use of RPC version)
-func find(id NodeAddress, start NodeAddress) (NodeAddress, error) {
-	fmt.Println("in find :=31")
+func find(id *big.Int, start NodeAddress) (NodeAddress, error) {
 	found, nextNode := false, start
 	var err error
 	for i := 0; i < maxSteps; i++ {
@@ -414,7 +409,7 @@ func find(id NodeAddress, start NodeAddress) (NodeAddress, error) {
 		reply := FindSuccessorReply{}
 		err = call(string(nextNode), "Node.FindSuccessor", &args, &reply)
 		if err != nil {
-			fmt.Println("Error searching for " + id)
+			fmt.Println("Error find searching for " + id.String())
 		}
 		found = reply.Found
 		if found {
@@ -427,4 +422,50 @@ func find(id NodeAddress, start NodeAddress) (NodeAddress, error) {
 		nextNode = reply.RetAddress
 	}
 	return NodeAddress(""), err
+}
+
+// Return nodeadress to successor who has the key			key is a filename
+func Lookup(key string, n *Node) (NodeAddress, error) {
+	hashedKey := hashString(key)
+	nodeAdress, err := find(hashedKey, n.address)
+	if err != nil {
+		return "", err
+	} else {
+		return nodeAdress, nil
+	}
+
+}
+func (node *Node) StoreFileRPC(file File, reply *StoreFileReply) error {
+
+	reply.Succeeded = node.StoreFileInChordStorage(file)
+	if !reply.Succeeded {
+		err := errors.New("failed to store file")
+		reply.Error = err
+		return err
+	}
+	reply.Error = nil
+	fmt.Println("File has been successfully stored")
+	return nil
+}
+
+// Save the file in the nodes chordStorage
+func (node *Node) StoreFileInChordStorage(file File) bool {
+
+	file.Id.Mod(file.Id, hashMod) // convert name back to normal
+	filePath := filepath.Join("nodeFiles", node.Name, "chordStorage", file.Name)
+
+	fileNew, err := os.Create(filePath)
+	if err != nil {
+		fmt.Println("couldnt create file")
+		return false
+	}
+	defer fileNew.Close()
+
+	_, err = fileNew.Write(file.Content)
+	if err != nil {
+		fmt.Println("couldnt write content to file!")
+		return false
+	}
+
+	return true
 }

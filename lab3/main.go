@@ -23,18 +23,17 @@ func main() {
 	if Arguments.JoinIpAdress != "" && Arguments.JoinPort != 0 { //Join existing chord ring
 		adressToJoin := fmt.Sprintf("%s:%d", Arguments.JoinIpAdress, Arguments.JoinPort)
 		fmt.Println("Joining existing chord ring with address: ", adressToJoin)
-		node.Join(Arguments) //TODO: joinfile
+		node.Join(Arguments)
 	} else { // Create a new chord ring
 		fmt.Println("Creating a chord with adress: ", Arguments.IpAdress, ":", Arguments.Port)
 		node.CreateChord()
 	}
 
-	//TODO: start timers (FixFingers, Stabilize, CheckPredecesor)
+	go node.TimedCalls()
 
 	fmt.Println("\nCommands: Ping (IP) (PORT), Lookup [???], StoreFile [???], PrintState, Quit")
 	for {
 		node.ParseCommand()
-
 		time.Sleep(time.Millisecond)
 	}
 
