@@ -304,6 +304,7 @@ func (n *Node) stabilize() {
 	if n.successors[0] == n.address {
 		if n.predecessor != "" {
 			n.successors[0] = n.predecessor
+			n.Notify(n.successors[0])
 		}
 		return
 	}
@@ -331,7 +332,7 @@ func (n *Node) stabilize() {
 			n.successors = append(n.successors[:2], reply.Successors_successors...)
 		}
 	}
-
+	n.fingerTable[0] = n.successors[0]
 	n.Notify(n.successors[0])
 
 }
@@ -354,13 +355,11 @@ func (n *Node) fixFingers() {
 	exp := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(n.next-1)), nil)
 	sum := new(big.Int).Add(n.Id, exp)
 	fingerID := new(big.Int).Mod(sum, hashMod)
-	args := FindSuccessorArgs{hashString(fingerID.String())}
-	reply := FindSuccessorReply{}
-	err := call(string(n.fingerTable[n.next]), "Node.FindSuccessor", &args, &reply)
+	node, err := find(fingerID, n.successors[0])
 	if err != nil {
 		fmt.Println("Error finger searching for " + fingerID.String())
 	}
-	n.fingerTable[n.next] = reply.RetAddress
+	n.fingerTable[n.next] = node
 
 	//n.fingerTable[n.next] = findSuccessor() //TODO placeholder Klar ovanför tror jag
 	//keep a global variable of "next entry to check" and increment it as this is periodically run

@@ -20,7 +20,6 @@ type StabilizeCall struct {
 
 // Response from stabilize data
 type StabilizeResponse struct {
-	Address               NodeAddress
 	Predecessor           NodeAddress
 	Successors_successors []NodeAddress
 }

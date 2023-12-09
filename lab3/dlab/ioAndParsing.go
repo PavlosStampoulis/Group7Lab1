@@ -272,17 +272,17 @@ func (n *Node) printState() {
 
 	fmt.Println("Node's successors:")
 	for i, node := range n.successors {
-		fmt.Println("Successor nr %d: %s\n", i, string(node))
+		fmt.Printf("Successor nr %d: %s\n", i+1, string(node))
 	}
 
 	fmt.Println("Node's Finger Table:")
 	for i, entr := range n.fingerTable {
-		fmt.Println("Finger %d:     Adress: %s", i, entr)
+		fmt.Printf("Finger %d:     Adress: %s\n", i+1, entr)
 	}
 
-	fmt.Println("Node's Buecket:")
+	fmt.Println("Node's Bucket:")
 	for key, val := range n.Bucket {
-		fmt.Println("Key: %d , Value: %s", key, val)
+		fmt.Printf("Key: %d , Value: %s\n", key, val)
 	}
 
 }

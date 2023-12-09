@@ -48,9 +48,8 @@ func getLocalAddress() string {
 	return localAddr.IP.String()
 }
 
-func between(startN NodeAddress, eltN NodeAddress, end *big.Int, inclusive bool) bool {
-	start := hashString(string(startN))
-	elt := hashString(string(eltN))
+func between(start *big.Int, elt *big.Int, end *big.Int, inclusive bool) bool {
+
 	if end.Cmp(start) > 0 {
 		return (start.Cmp(elt) < 0 && elt.Cmp(end) < 0) || (inclusive && elt.Cmp(end) == 0)
 	} else {
