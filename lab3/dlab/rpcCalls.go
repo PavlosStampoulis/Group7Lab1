@@ -41,7 +41,11 @@ func (n *Node) getNumberSuccessors(args *NumberSuccessorsCall, reply *NumberSucc
 
 // NotifyReceiver: recieve notification from node believing to be our Predecessor
 func (n *Node) NotifyReceiver(args *NotifyArgs, reply *NotifyReply) error {
-	if (n.predecessor == "") || between(hashString(string(n.predecessor)), hashString(string(args.Address)), n.Id, true) {
+	pre := hashString(string(n.predecessor))
+	pre.Mod(pre, hashMod)
+	bet := hashString(string(args.Address))
+	bet.Mod(bet, hashMod)
+	if (n.predecessor == "") || between(pre, bet, n.Id, true) {
 		fmt.Println("should set predecessor, ", args.Address)
 		n.predecessor = args.Address
 		reply.Ok = true
@@ -62,8 +66,10 @@ func (n *Node) StabilizeData(args *StabilizeCall, reply *StabilizeResponse) erro
 func (n *Node) FindSuccessor(args *FindSuccessorArgs, reply *FindSuccessorReply) error {
 
 	prev := hashString(string(n.address))
+	prev.Mod(prev, hashMod)
 	for i, node := range n.successors {
 		curr := hashString(string(node))
+		curr.Mod(curr, hashMod)
 		if between(prev, args.Id, curr, true) {
 			reply.Found = true
 			reply.RetAddress = n.successors[i]

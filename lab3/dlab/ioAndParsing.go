@@ -272,7 +272,9 @@ func (n *Node) printState() {
 
 	fmt.Println("Node's successors:")
 	for i, node := range n.successors {
-		fmt.Printf("Successor nr %d: %s\n", i+1, string(node))
+		nid := hashString(string(node))
+		nid.Mod(nid, hashMod)
+		fmt.Printf("Successor nr %d: %s ,id:%s\n", i+1, string(node), nid.String())
 	}
 
 	fmt.Println("Node's Finger Table:")

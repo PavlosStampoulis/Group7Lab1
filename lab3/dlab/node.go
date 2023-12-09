@@ -67,7 +67,7 @@ func NewNode(args *Arguments) *Node {
 		temp := strings.Replace(string(node.address), ".", "", -1)
 		node.Name = strings.Replace(temp, ":", "", -1)
 	}
-	node.Id = hashString(string(node.Name))
+	node.Id = hashString(string(node.address)) //NOTE CHANGED !
 	node.Id.Mod(node.Id, hashMod)
 	node.fingerTable = make([]NodeAddress, fingerTableSize+1) // finger table entry (using 1-based numbering).
 	node.successors = make([]NodeAddress, args.NumSuccessors) //set size of successors array
@@ -389,6 +389,7 @@ func (n *Node) closestPredecessor(id *big.Int) NodeAddress {
 	closestPre := n.address
 	for _, node := range n.fingerTable {
 		nodeHash := hashString(string(node))
+		nodeHash.Mod(nodeHash, hashMod)
 		x := nodeHash.Cmp(id)
 		if x == -1 {
 			closestPre = node
