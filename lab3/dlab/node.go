@@ -348,7 +348,7 @@ func (n *Node) Notify(np NodeAddress) {
 // note n.next +1 and % len(n.fingerTable)-1 is to skip entry 0 which is fixed in stabilize
 func (n *Node) fixFingers() {
 
-	exp := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(n.next-1)), nil)
+	exp := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(n.next)), nil)
 	sum := new(big.Int).Add(n.Id, exp)
 	fingerID := new(big.Int).Mod(sum, hashMod)
 	node, err := find(fingerID, n.successors[0])
