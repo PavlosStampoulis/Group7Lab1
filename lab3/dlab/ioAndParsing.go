@@ -88,7 +88,7 @@ func (n *Node) ParseCommand() {
 		if err != nil {
 			fmt.Print(err)
 		}
-		fmt.Println("Store file done! \n")
+		fmt.Println("Store file done!")
 
 	case "PrintState", "printstate":
 		n.printState()

@@ -315,22 +315,17 @@ func (n *Node) stabilize() {
 	args := StabilizeCall{}
 	reply := StabilizeResponse{}
 	err := call(string(n.successors[0]), "Node.StabilizeData", &args, &reply)
+	caps := cap(n.successors)
 	if err != nil {
 		n.successors = append(n.successors[1:], n.address)
 	} else if reply.Predecessor == n.address {
-		if cap(n.successors) <= len(reply.Successors_successors) {
-			n.successors = append(n.successors[:1], reply.Successors_successors[:cap(n.successors)-1]...)
-		} else {
-			n.successors = append(n.successors[:1], reply.Successors_successors...)
-		}
+		newS := append(n.successors[:1], reply.Successors_successors...)
+		copy(n.successors, newS[:caps])
 	} else {
 		n.successors[1] = n.successors[0]
 		n.successors[0] = reply.Predecessor
-		if len(reply.Successors_successors) <= cap(reply.Successors_successors)-1 {
-			n.successors = append(n.successors[:2], reply.Successors_successors[:cap(n.successors)-2]...)
-		} else {
-			n.successors = append(n.successors[:2], reply.Successors_successors...)
-		}
+		newS := append(n.successors[:2], reply.Successors_successors...)
+		copy(n.successors, newS[:caps])
 	}
 	n.fingerTable[0] = n.successors[0]
 	n.Notify(n.successors[0])
@@ -350,6 +345,7 @@ func (n *Node) Notify(np NodeAddress) {
 }
 
 // fixFingers: Periodically called to update/confirm part of the finger table (not all entries at once)
+// note n.next +1 and % len(n.fingerTable)-1 is to skip entry 0 which is fixed in stabilize
 func (n *Node) fixFingers() {
 
 	exp := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(n.next-1)), nil)
@@ -359,11 +355,11 @@ func (n *Node) fixFingers() {
 	if err != nil {
 		fmt.Println("Error finger searching for " + fingerID.String())
 	}
-	n.fingerTable[n.next] = node
+	n.fingerTable[n.next+1] = node
 
 	//n.fingerTable[n.next] = findSuccessor() //TODO placeholder Klar ovanför tror jag
 	//keep a global variable of "next entry to check" and increment it as this is periodically run
-	n.next = (n.next + 1) % len(n.fingerTable)
+	n.next = (n.next + 1) % (len(n.fingerTable) - 1)
 
 }
 
