@@ -12,15 +12,15 @@ import (
 )
 
 type Arguments struct {
-	IpAdress                 string // cur. node address
-	Port                     int    // cur. node port
-	JoinIpAdress             string // join node adress
-	JoinPort                 int64  // join node port
-	StabilizeInterval        int64  // stabilize() after 'StabilizeInterval' milliseconds
-	FixFingersInterval       int64  // fixFingers() after 'FixFingersInterval' milliseconds
-	CheckpredecessorInterval int64  // checkPredecessor() after 'CheckpredecessorInterval' milliseconds
-	NumSuccessors            int64
-	Identifier               string
+	IpAdress      string // cur. node address
+	Port          int    // cur. node port
+	JoinIpAdress  string // join node adress
+	JoinPort      int64  // join node port
+	SInterval     int64  // stabilize() after 'StabilizeInterval' milliseconds
+	FInterval     int64  // fixFingers() after 'FixFingersInterval' milliseconds
+	CInterval     int64  // checkPredecessor() after 'CheckpredecessorInterval' milliseconds
+	NumSuccessors int64
+	Identifier    string
 }
 
 func ReadArgsConfigureChord() *Arguments {
@@ -59,6 +59,7 @@ func (n *Node) ParseCommand() {
 
 	case "Quit", "quit", "exit", "Exit": //TODO TODO TODO TODO
 		fmt.Println("\nMoving data to successor: " + n.successors[0].Id.String())
+		call(string(n.successors[0].Address), "Node.PutAll", n.Bucket, &struct{}{})
 		fmt.Println("\nTerminating Node")
 		os.Exit(0)
 
@@ -164,7 +165,7 @@ func (args *Arguments) ValidateArgs(userInput []string) bool {
 				fmt.Printf("Invalid Stabilize Interval: %s\n", userInput[i])
 				return false
 			}
-			args.StabilizeInterval = tsInterval
+			args.SInterval = tsInterval
 
 		case "--tff":
 			i++
@@ -173,7 +174,7 @@ func (args *Arguments) ValidateArgs(userInput []string) bool {
 				fmt.Printf("Invalid FixFingersInterval: %s\n", userInput[i])
 				return false
 			}
-			args.FixFingersInterval = tffInterval
+			args.FInterval = tffInterval
 
 		case "--tcp":
 			i++
@@ -182,7 +183,7 @@ func (args *Arguments) ValidateArgs(userInput []string) bool {
 				fmt.Printf("Invalid Check predecessor Interval: %s\n", userInput[i])
 				return false
 			}
-			args.CheckpredecessorInterval = tcpInterval
+			args.CInterval = tcpInterval
 
 		case "-r":
 			i++
@@ -220,7 +221,7 @@ func (args *Arguments) ValidateArgs(userInput []string) bool {
 		return false
 	}
 
-	if args.CheckpredecessorInterval != 0 && args.FixFingersInterval != 0 && args.IpAdress != "" && args.NumSuccessors != 0 && args.Port != 0 && args.StabilizeInterval != 0 {
+	if args.CInterval != 0 && args.FInterval != 0 && args.IpAdress != "" && args.NumSuccessors != 0 && args.Port != 0 && args.SInterval != 0 {
 		return true
 
 	}

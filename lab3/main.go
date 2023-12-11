@@ -29,7 +29,7 @@ func main() {
 		fmt.Println("Creating a chord with adress: ", Arguments.IpAdress, ":", Arguments.Port)
 	}
 
-	go node.TimedCalls()
+	go node.TimedCalls(Arguments.SInterval, Arguments.FInterval, Arguments.CInterval)
 
 	fmt.Println("\nCommands: Ping (IP) (PORT), Lookup [???], StoreFile [???], PrintState, Quit")
 	for {

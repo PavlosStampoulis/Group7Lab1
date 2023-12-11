@@ -42,14 +42,14 @@ func (n *Node) NotifyReceiver(args *NotifyArgs, reply *NotifyReply) error {
 }
 
 func (n *Node) StabilizeData(args *StabilizeCall, reply *StabilizeResponse) error {
+	//n.mu.Lock()
 	reply.Predecessor = n.predecessor
 	reply.Successors_successors = n.successors
-
+	//n.mu.Unlock()
 	return nil
 }
 
 func (n *Node) FindSuccessor(args *FindSuccessorArgs, reply *FindSuccessorReply) error {
-
 	prev := n.myInfo.Id
 	prev.Mod(prev, hashMod)
 	for i, node := range n.successors {

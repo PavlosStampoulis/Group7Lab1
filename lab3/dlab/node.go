@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	//"sync"
 )
 
 var emptyBig = new(big.Int)
@@ -39,7 +40,7 @@ type NodeInfo struct {
 type Node struct {
 	next int // pointer to next fingertable entry
 	Name string
-
+	//mu   sync.Mutex // avoid conflicts in concurrent programs.
 	//Chord:
 	successors  []NodeInfo // List of ids and addresses (IP & Port) to the next several nodes on the ring
 	predecessor NodeInfo   // An id and address to the previous node on the circle
@@ -282,24 +283,44 @@ func (n *Node) Join(args *Arguments) error {
 	return nil
 }
 
-func (n *Node) TimedCalls() {
+func (n *Node) TimedCalls(sInt, fInt, cInt int64) {
+	sTime := sInt
+	fTime := fInt
+	cTime := cInt
+
 	for {
-		n.stabilize()
-		time.Sleep(300 * time.Millisecond)
-		n.fixFingers()
-		time.Sleep(300 * time.Millisecond)
-		n.checkPredecessor()
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(time.Millisecond)
+		sTime--
+		fTime--
+		cTime--
+
+		if sTime == 0 {
+			n.stabilize()
+			sTime = sInt
+		}
+		if fTime == 0 {
+			n.fixFingers()
+			fTime = fInt
+		}
+		if cTime == 0 {
+			n.checkPredecessor()
+			cTime = cInt
+		}
+
 	}
+
 }
 
 // stabilize: This function is periodically used to check the immediate successor and notify it about this node
 func (n *Node) stabilize() {
+
+	//n.mu.Lock()
 	if n.successors[0].Address == n.myInfo.Address {
 		if n.predecessor.Address != "" {
 			n.successors[0] = n.predecessor
 			n.Notify(n.successors[0].Address)
 		}
+		//n.mu.Unlock()
 		return
 	}
 
@@ -323,6 +344,7 @@ func (n *Node) stabilize() {
 	}
 	n.fingerTable[0] = n.successors[0]
 	n.Notify(n.successors[0].Address)
+	//n.mu.Unlock()
 
 }
 
@@ -346,6 +368,8 @@ func (n *Node) Notify(np NodeAddress) {
 // fixFingers: Periodically called to update/confirm part of the finger table (not all entries at once)
 // note n.next +1 and % len(n.fingerTable)-1 is to skip entry 0 which is fixed in stabilize
 func (n *Node) fixFingers() {
+
+	//n.mu.Lock()
 	exp := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(n.next)), nil)
 	sum := new(big.Int).Add(n.myInfo.Id, exp)
 	fingerID := new(big.Int).Mod(sum, hashMod)
@@ -356,16 +380,21 @@ func (n *Node) fixFingers() {
 	n.fingerTable[n.next+1] = node
 	//keep a global variable of "next entry to check" and increment it as this is periodically run
 	n.next = (n.next + 1) % (len(n.fingerTable) - 1)
+	//n.mu.Unlock()
 
 }
 
 // checkPredecessor: This function should occasionally be called to check if the current predecessor is alive
 func (n *Node) checkPredecessor() {
+
+	//n.mu.Lock()
 	if n.predecessor.Address == "" {
+		//n.mu.Unlock()
 		return
 	} else if n.predecessor.Address == n.myInfo.Address {
 		n.predecessor.Address = ""
 		n.predecessor.Id = emptyBig
+		//n.mu.Unlock()
 		return
 	}
 	args := PingArgs{}
@@ -375,12 +404,16 @@ func (n *Node) checkPredecessor() {
 		n.predecessor.Address = ""
 		n.predecessor.Id = emptyBig
 	}
+	//n.mu.Unlock()
+
 }
 
 // closestPredecessor: check your finger table to find the node closest before id
 // if finger table not initiated, return yourself and don't run the rest
 func (n *Node) closestPredecessor(id *big.Int) NodeInfo {
+	//n.mu.Lock()
 	if n.fingerTable[0] == n.myInfo {
+		//n.mu.Unlock()
 		return n.successors[0]
 	}
 	closestPre := n.myInfo
@@ -389,9 +422,11 @@ func (n *Node) closestPredecessor(id *big.Int) NodeInfo {
 		if x == -1 {
 			closestPre = node
 		} else if x == 0 {
+			//n.mu.Unlock()
 			return closestPre
 		}
 	}
+
 	return closestPre
 }
 
@@ -470,4 +505,11 @@ func (node *Node) StoreFileInChordStorage(file File) bool {
 	}
 
 	return true
+}
+
+func (node Node) PutAll(bucket map[*big.Int]string, empty *struct{}) error {
+	for key, Value := range bucket {
+		node.Bucket[key] = Value
+	}
+	return nil
 }
