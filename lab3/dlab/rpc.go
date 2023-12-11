@@ -1,6 +1,9 @@
 package dlab
 
-import "math/big"
+import (
+	"crypto/rsa"
+	"math/big"
+)
 
 type PingArgs struct {
 }
@@ -50,4 +53,15 @@ type File struct {
 type StoreFileReply struct {
 	Succeeded bool
 	Error     error
+}
+
+type StoreFileArgs struct {
+	File File
+}
+
+type RequestPubKeyArgs struct {
+}
+
+type RequestPubKeyReply struct {
+	Key *rsa.PublicKey
 }

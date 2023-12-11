@@ -76,13 +76,18 @@ func (n *Node) ParseCommand() {
 
 	case "Lookup", "lookup": //Finds who has a specific key
 		if len(commandLine) != 2 {
-			fmt.Print("Enter the key to lookup: ")
+			fmt.Print("Enter the filename to lookup: ")
 			keyToFind, _ := reader.ReadString('\n')
-			fmt.Println(keyToFind)
-			Lookup(keyToFind, n)
+			key, ans, err := Lookup(keyToFind, n)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			fmt.Println("Id: " + key.String() + " Address: " + string(ans))
 		}
+
 	case "StoreFile", "storefile":
-		fmt.Println("Enter name of file to store:")
+		fmt.Println("Enter local path to the of file you want to save")
 		fileName, _ := reader.ReadString('\n')
 		err := FindAndstoreFile(fileName, n)
 		if err != nil {
@@ -121,7 +126,7 @@ func (n *Node) ParseCommand() {
 		fmt.Println("Pong! :D")
 
 	default:
-		fmt.Println("\nCommands: Ping (IP) (PORT), Lookup [???], StoreFile [???], PrintState, Quit ")
+		fmt.Println("\nCommands: Ping (IP) (PORT), Lookup Filename, StoreFile [???], PrintState, Quit ")
 	}
 
 }

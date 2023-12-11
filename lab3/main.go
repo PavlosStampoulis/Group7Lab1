@@ -18,6 +18,7 @@ func main() {
 	node := dlab.NewNode(Arguments)
 
 	rpc.Register(node) // now we can call using the node
+
 	node.Server()
 
 	if Arguments.JoinIpAdress != "" && Arguments.JoinPort != 0 { //Join existing chord ring

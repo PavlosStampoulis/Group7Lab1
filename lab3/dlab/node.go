@@ -97,7 +97,7 @@ func (node *Node) encrypt() error {
 	if _, err := os.Stat(privateKeyPath); os.IsNotExist(err) {
 		// Private key doesn't exist, generate and save it
 		if err := node.createRSAPrivateKey(); err != nil {
-			fmt.Errorf("failed to create RSA private key: %v", err)
+			fmt.Errorf("failed to create r private key: %v", err)
 			return err
 		}
 	}
@@ -420,20 +420,21 @@ func find(id *big.Int, start NodeAddress) (NodeAddress, error) {
 	return NodeAddress(""), err
 }
 
-// Return nodeadress to successor who has the key			key is a filename
-func Lookup(key string, n *Node) (NodeAddress, error) {
+// Return key and nodeadress to successor who has the key			key is a filename
+func Lookup(key string, n *Node) (*big.Int, NodeAddress, error) {
 	hashedKey := hashString(key)
+	hashedKey.Mod(hashedKey, hashMod)
 	nodeAdress, err := find(hashedKey, n.address)
 	if err != nil {
-		return "", err
+		return hashedKey, "", err
 	} else {
-		return nodeAdress, nil
+		return hashedKey, nodeAdress, nil
 	}
 
 }
-func (node *Node) StoreFileRPC(file File, reply *StoreFileReply) error {
+func (node *Node) StoreFileRPC(file *StoreFileArgs, reply *StoreFileReply) error {
 
-	reply.Succeeded = node.StoreFileInChordStorage(file)
+	reply.Succeeded = node.StoreFileInChordStorage(file.File)
 	if !reply.Succeeded {
 		err := errors.New("failed to store file")
 		reply.Error = err
@@ -457,6 +458,12 @@ func (node *Node) StoreFileInChordStorage(file File) bool {
 	}
 	defer fileNew.Close()
 
+	file.Content, err = node.decryptFileContent(file.Content)
+	if err != nil {
+		fmt.Println("error decrypting file")
+		//should prolly remove file
+		return false
+	}
 	_, err = fileNew.Write(file.Content)
 	if err != nil {
 		fmt.Println("couldnt write content to file!")

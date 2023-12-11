@@ -1,10 +1,13 @@
 package dlab
 
 import (
+	"crypto/rsa"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"math/big"
 	"net/rpc"
+	"net/rpc/jsonrpc"
 )
 
 func call(address string, method string, args interface{}, reply interface{}) error {
@@ -24,6 +27,29 @@ func call(address string, method string, args interface{}, reply interface{}) er
 
 	fmt.Println(err)
 	return err
+}
+
+func callSecure(address string, method string, args interface{}, reply interface{}) error {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true, // You may want to set this to false in a production environment
+	}
+
+	conn, err := tls.Dial("tcp", address, tlsConfig)
+	if err != nil {
+		log.Println("dialing:", err)
+		return err
+	}
+	defer conn.Close()
+
+	client := rpc.NewClientWithCodec(jsonrpc.NewClientCodec(conn))
+
+	err = client.Call(method, args, reply)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	return nil
 }
 
 func (n *Node) Ping(args *PingArgs, reply *PongReply) error {
@@ -51,7 +77,6 @@ func (n *Node) NotifyReceiver(args *NotifyArgs, reply *NotifyReply) error {
 		reply.Ok = true
 		return nil
 	}
-
 	reply.Ok = false
 	return nil
 }
@@ -102,3 +127,18 @@ func (n *Node) MoveAll(bucket map[*big.Int]string, emptyReply *struct{}) error {
 	call(adress, "MoveAll")
 	return nil
 }*/
+
+func (n *Node) KeyRequest(node NodeAddress) (*rsa.PublicKey, error) {
+	args := RequestPubKeyArgs{}
+	reply := RequestPubKeyReply{}
+	err := call(string(node), "Node.RecieveKeyRequest", &args, &reply)
+	if err != nil {
+		return nil, err
+	}
+	return reply.Key, nil
+}
+
+func (n *Node) RecieveKeyRequest(args *RequestPubKeyArgs, reply *RequestPubKeyReply) error {
+	reply.Key = n.PublicKey
+	return nil
+}
