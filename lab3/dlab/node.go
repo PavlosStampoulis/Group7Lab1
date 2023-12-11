@@ -474,6 +474,7 @@ func (node *Node) StoreFileRPC(file *StoreFileArgs, reply *StoreFileReply) error
 		reply.Error = err
 		return err
 	}
+	node.Bucket[file.File.Id] = file.File.Name
 	reply.Error = nil
 	fmt.Println("File has been successfully stored")
 	return nil
