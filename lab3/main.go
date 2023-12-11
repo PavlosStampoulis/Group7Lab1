@@ -27,7 +27,6 @@ func main() {
 		node.Join(Arguments)
 	} else { // Create a new chord ring
 		fmt.Println("Creating a chord with adress: ", Arguments.IpAdress, ":", Arguments.Port)
-		node.CreateChord()
 	}
 
 	go node.TimedCalls()

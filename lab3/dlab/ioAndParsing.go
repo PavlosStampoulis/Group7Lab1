@@ -43,7 +43,6 @@ func ReadArgsConfigureChord() *Arguments {
 
 func ReadLine() []string {
 	var userInput string
-	fmt.Print("$ ")
 	reader := bufio.NewReader(os.Stdin)
 	userInput, _ = reader.ReadString('\n')
 	userInput = strings.TrimSpace(userInput)
@@ -58,21 +57,10 @@ func (n *Node) ParseCommand() {
 	case "help", "Help":
 		fmt.Println("\nCommands: Ping (IP) (PORT), Lookup [???], StoreFile [???], PrintState, Quit ")
 
-	case "Quit", "quit", "exit", "Exit":
-		fmt.Println("\nMoving data to successor: " + n.successors[0])
-		//TODO: call(string(n.successors[0]), "MoveAll", n.Bucket, &struct{}{})
+	case "Quit", "quit", "exit", "Exit": //TODO TODO TODO TODO
+		fmt.Println("\nMoving data to successor: " + n.successors[0].Id.String())
 		fmt.Println("\nTerminating Node")
 		os.Exit(0)
-
-	case "GET", "get", "Get":
-		fmt.Print("Enter the name of the file you want to get: ")
-		fileName, _ := reader.ReadString('\n')
-		fileName = strings.TrimSpace(fileName)
-		err := GetFile(fileName, n)
-		if err != nil {
-			fmt.Println("Couldnt get file, ", err)
-		}
-		fmt.Println("Get file done!")
 
 	case "Lookup", "lookup": //Finds who has a specific key
 		if len(commandLine) != 2 {
@@ -83,7 +71,7 @@ func (n *Node) ParseCommand() {
 				log.Println(err)
 				return
 			}
-			fmt.Println("Id: " + key.String() + " Address: " + string(ans))
+			fmt.Println("Id: " + key.String() + " Address: " + string(ans.Address))
 		}
 
 	case "StoreFile", "storefile":
@@ -126,7 +114,7 @@ func (n *Node) ParseCommand() {
 		fmt.Println("Pong! :D")
 
 	default:
-		fmt.Println("\nCommands: Ping (IP) (PORT), Lookup Filename, StoreFile [???], PrintState, Quit ")
+		fmt.Println("\nCommands: Ping (IP) (PORT), Lookup Filename, StoreFile Filepath, PrintState, Quit ")
 	}
 
 }
@@ -271,20 +259,19 @@ func validateInterval(intervalStr string, upperIntervalLimit int64) (int64, erro
 
 func (n *Node) printState() {
 	fmt.Println("\n\n Printing state for node: " + n.Name)
-	fmt.Println("Adress: ", n.address)
-	fmt.Println("Predecessor: ", n.predecessor)
-	fmt.Println("Identifier: ", n.Id)
+	fmt.Println("Adress: ", n.myInfo.Address)
+	fmt.Println("Predecessor: " + string(n.predecessor.Address) + " Id:" + n.predecessor.Id.String())
+	fmt.Println("Identifier: ", n.myInfo.Id)
 
 	fmt.Println("Node's successors:")
 	for i, node := range n.successors {
-		nid := hashString(string(node))
-		nid.Mod(nid, hashMod)
-		fmt.Printf("Successor nr %d: %s ,id:%s\n", i+1, string(node), nid.String())
+
+		fmt.Printf("Successor nr %d: %s ,id:%s\n", i+1, string(node.Address), node.Id)
 	}
 
 	fmt.Println("Node's Finger Table:")
 	for i, entr := range n.fingerTable {
-		fmt.Printf("Finger %d:     Adress: %s\n", i+1, entr)
+		fmt.Printf("Finger %d: Adress: %s Id:%s\n", i+1, entr.Address, entr.Id.String())
 	}
 
 	fmt.Println("Node's Bucket:")

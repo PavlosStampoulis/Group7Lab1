@@ -2,18 +2,14 @@ package dlab
 
 import (
 	"crypto/rsa"
-	"crypto/tls"
 	"fmt"
 	"log"
 	"math/big"
 	"net/rpc"
-	"net/rpc/jsonrpc"
 )
 
 func call(address string, method string, args interface{}, reply interface{}) error {
 	c, err := rpc.DialHTTP("tcp", address)
-	//sockname := coordinatorSock()
-	//c, err := rpc.DialHTTP("unix", sockname)
 	if err != nil {
 		log.Println("dialing:", err)
 		return err
@@ -29,51 +25,15 @@ func call(address string, method string, args interface{}, reply interface{}) er
 	return err
 }
 
-func callSecure(address string, method string, args interface{}, reply interface{}) error {
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true, // You may want to set this to false in a production environment
-	}
-
-	conn, err := tls.Dial("tcp", address, tlsConfig)
-	if err != nil {
-		log.Println("dialing:", err)
-		return err
-	}
-	defer conn.Close()
-
-	client := rpc.NewClientWithCodec(jsonrpc.NewClientCodec(conn))
-
-	err = client.Call(method, args, reply)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	return nil
-}
-
 func (n *Node) Ping(args *PingArgs, reply *PongReply) error {
 
 	return nil
 }
 
-/*
-func (n *Node) getNumberSuccessors(args *NumberSuccessorsCall, reply *NumberSuccessorsResponse) error {
-
-	reply.numberofsuccessors = globalNumberSuccessors
-
-	return nil
-}*/
-
 // NotifyReceiver: recieve notification from node believing to be our Predecessor
 func (n *Node) NotifyReceiver(args *NotifyArgs, reply *NotifyReply) error {
-	pre := hashString(string(n.predecessor))
-	pre.Mod(pre, hashMod)
-	bet := hashString(string(args.Address))
-	bet.Mod(bet, hashMod)
-	if (n.predecessor == "") || between(pre, bet, n.Id, true) {
-		fmt.Println("should set predecessor, ", args.Address)
-		n.predecessor = args.Address
+	if (string(n.predecessor.Address) == "") || between(n.predecessor.Id, args.Info.Id, n.myInfo.Id, true) {
+		n.predecessor = args.Info
 		reply.Ok = true
 		return nil
 	}
@@ -90,11 +50,10 @@ func (n *Node) StabilizeData(args *StabilizeCall, reply *StabilizeResponse) erro
 
 func (n *Node) FindSuccessor(args *FindSuccessorArgs, reply *FindSuccessorReply) error {
 
-	prev := hashString(string(n.address))
+	prev := n.myInfo.Id
 	prev.Mod(prev, hashMod)
 	for i, node := range n.successors {
-		curr := hashString(string(node))
-		curr.Mod(curr, hashMod)
+		curr := node.Id
 		if between(prev, args.Id, curr, true) {
 			reply.Found = true
 			reply.RetAddress = n.successors[i]

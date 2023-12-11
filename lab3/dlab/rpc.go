@@ -10,25 +10,17 @@ type PingArgs struct {
 type PongReply struct {
 }
 
-/*
-type NumberSuccessorsCall struct {
-}
-
-	type NumberSuccessorsResponse struct {
-		numberofsuccessors int64
-	}
-*/
 type StabilizeCall struct {
 }
 
 // Response from stabilize data
 type StabilizeResponse struct {
-	Predecessor           NodeAddress
-	Successors_successors []NodeAddress
+	Predecessor           NodeInfo
+	Successors_successors []NodeInfo
 }
 
 type NotifyArgs struct {
-	Address NodeAddress
+	Info NodeInfo
 }
 
 type NotifyReply struct {
@@ -41,7 +33,7 @@ type FindSuccessorArgs struct {
 
 type FindSuccessorReply struct {
 	Found      bool
-	RetAddress NodeAddress
+	RetAddress NodeInfo
 }
 
 type File struct {

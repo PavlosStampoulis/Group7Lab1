@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"net/http"
 	"net/rpc"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -28,35 +26,13 @@ func hashString(elt string) *big.Int {
 func (n *Node) Server() {
 	rpc.Register(n)
 	rpc.HandleHTTP()
-	l, e := net.Listen("tcp", string(n.address))
+	l, e := net.Listen("tcp", string(n.myInfo.Address))
 
 	if e != nil {
 		log.Fatal("listen error:", e)
 	}
 	go http.Serve(l, nil)
 
-}
-
-func (n *Node) ServerSecure() {
-	rpc.Register(n)
-	rpc.HandleHTTP()
-
-	cert, err := tls.LoadX509KeyPair("server.pem", "server-key.pem")
-	if err != nil {
-		log.Fatal("Error loading server certificates:", err)
-	}
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		// Other TLS configuration options as needed
-	}
-
-	l, e := tls.Listen("tcp", string(n.address), tlsConfig)
-	if e != nil {
-		log.Fatal("listen error:", e)
-	}
-
-	go http.Serve(l, nil)
 }
 
 func getLocalAddress() string {
@@ -93,10 +69,7 @@ func FindAndstoreFile(filepath string, node *Node) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("filepath:", filepath)
-	wd, _ := os.Getwd()
-	fmt.Println("working directory:", wd)
-	println(nodeAdressToGiveFile) //temp to use var
+
 	file, err := os.Open(filepath)
 	if err != nil {
 		fmt.Println("Cant open file!")
@@ -114,7 +87,7 @@ func FindAndstoreFile(filepath string, node *Node) error {
 	}
 
 	//Encryption
-	pubKey, err := node.KeyRequest(nodeAdressToGiveFile)
+	pubKey, err := node.KeyRequest(nodeAdressToGiveFile.Address)
 	if err != nil {
 		fmt.Println("couldnt get rsa public key!")
 		return err
@@ -126,44 +99,12 @@ func FindAndstoreFile(filepath string, node *Node) error {
 
 	args := StoreFileArgs{fileInfo}
 	reply := StoreFileReply{}
-	err = call(string(nodeAdressToGiveFile), "Node.StoreFileRPC", &args, &reply)
+	err = call(string(nodeAdressToGiveFile.Address), "Node.StoreFileRPC", &args, &reply)
 	if err != nil || reply.Error != nil {
 		fmt.Println(err, reply.Error)
 		return errors.New("something went wrong when calling storefilerpc")
 	}
-	//
 
-	//Send file securely to found address
-
-	/*
-		fmt.Println("Found file at node adress: ", nodeAdressWhoHasFile)
-		FilePath := filepath.Join("nodeFiles", node.Name, "upload", filename) //nodeFiles/node.Name/upload/filename
-		file, err := os.Open(FilePath)
-		if err != nil {
-			fmt.Println("Cant open file!")
-			return err
-		}
-		defer file.Close()
-
-		fileInfo := File{}
-		fileInfo.Name = filename
-		fileInfo.Id = hashString(filename)
-		fileInfo.Id.Mod(fileInfo.Id, hashMod)
-		fileInfo.Content, err = io.ReadAll(file)
-		if err != nil {
-			fmt.Println("Cant read fileconent!")
-			return err
-		}
-		fileInfo.Content, err = node.encryptFileContent(fileInfo.Content)
-		if err != nil {
-			return err
-		}
-		reply := StoreFileReply{}
-		err = call(string(nodeAdressWhoHasFile), "Node.StoreFileRPC", fileInfo, &reply)
-		if err != nil || reply.Error != nil {
-			fmt.Println(err, reply.Error)
-			return errors.New("something went wrong when calling storefilerpc")
-		}*/
 	return nil
 }
 
@@ -185,58 +126,4 @@ func (node *Node) decryptFileContent(content []byte) ([]byte, error) {
 		return make([]byte, 0), err
 	}
 	return decryptedContent, nil
-}
-
-func GetFile(fileName string, node *Node) error {
-	_, nodeAdressWhoHasFile, err := Lookup(fileName, node)
-	if err != nil {
-		fmt.Println("Couldnt complete Lookup ")
-		return err
-	}
-	fmt.Println("Found file at node adress: ", nodeAdressWhoHasFile)
-
-	fileInfo := File{}
-	fileInfo.Name = fileName
-	fileInfo.Id = hashString(fileName)
-	fileInfo.Id.Mod(fileInfo.Id, hashMod)
-
-	err = call(string(nodeAdressWhoHasFile), "GetFileRPC", fileInfo, &fileInfo)
-	if err != nil {
-		fmt.Println("couldnt get file")
-		return err
-	}
-	fileInfo.Content, err = node.decryptFileContent(fileInfo.Content)
-	if err != nil {
-		fmt.Println("couldnt decrypt file")
-		return err
-	}
-
-	err = node.StoreFileOnNode(fileInfo)
-	if err != nil {
-		fmt.Println("couldnt save file on node")
-		return err
-	}
-	return nil
-}
-
-// store file at node
-func (node *Node) StoreFileOnNode(fileInfo File) error {
-	fileInfo.Id.Mod(fileInfo.Id, hashMod)
-	saveFilePath := filepath.Join("nodeFiles", node.Name, "download", fileInfo.Name)
-
-	file, err := os.Create(saveFilePath)
-	if err != nil {
-		fmt.Println("Couldnt create file ", err)
-		return err
-	}
-
-	defer file.Close()
-
-	_, err = file.Write(fileInfo.Content)
-	if err != nil {
-		fmt.Println("Couldnt write content to file ", err)
-		return err
-	}
-
-	return nil
 }
