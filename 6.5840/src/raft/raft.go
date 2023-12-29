@@ -20,6 +20,7 @@ package raft
 import (
 	//	"bytes"
 
+	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -175,28 +176,30 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	if args.Term < rf.currentTerm || args.LastLogIndex < rf.lastApplied {
+	if args.Term < rf.currentTerm || args.LastLogIndex < rf.commitIndex {
 		reply.Term = rf.currentTerm
 		reply.VoteGranted = false
 		return
-	} else if (rf.votedFor == -1 || rf.votedFor == args.CandidateId || rf.currentTerm < args.Term) && rf.lastApplied <= args.LastLogIndex {
-		if rf.lastApplied < 0 {
+	} else if (rf.votedFor == -1 || rf.votedFor == args.CandidateId || rf.currentTerm < args.Term) && rf.commitIndex <= args.LastLogIndex {
+		rf.currentTerm = args.Term
+		if rf.commitIndex < 0 {
 			rf.timeSinceBeat = 0
-			rf.currentTerm = args.Term // already checked to be at least as big as our Term
 			rf.votedFor = args.CandidateId
 			rf.myState = Follower
 			reply.Term = rf.currentTerm
 			reply.VoteGranted = true
 			return
-		} else if rf.log[rf.lastApplied].Term <= args.LastLogTerm {
+		} else if rf.log[rf.commitIndex].Term <= args.LastLogTerm {
 			rf.timeSinceBeat = 0
-			rf.currentTerm = args.Term // already checked to be at least as big as our Term
 			rf.votedFor = args.CandidateId
 			rf.myState = Follower
 			reply.Term = rf.currentTerm
 			reply.VoteGranted = true
 			return
 		}
+		fmt.Println("Outside of all ifs")
+	} else if rf.votedFor == rf.me && rf.currentTerm == args.Term && rf.commitIndex < args.LastLogIndex {
+		rf.timeSinceBeat = 0 //I clearly shouldn't candidate first yo
 	}
 	rf.currentTerm = args.Term // already checked to be at least as big as our Term
 	reply.Term = rf.currentTerm
@@ -289,7 +292,6 @@ func (rf *Raft) ticker() {
 	for rf.killed() == false {
 
 		// Your code here (2A)
-
 		if rf.myState == Candidate {
 			yesVote := 0
 			for _, rep := range replies {
@@ -308,7 +310,7 @@ func (rf *Raft) ticker() {
 				}
 				rf.mu.Unlock()
 			}
-			//fmt.Println(fmt.Sprint(rf.me)+" recieved nr votes: ", yesVote)
+
 			if yesVote > len(rf.peers)/2 {
 				//congrats, you're leader
 				//println(fmt.Sprint(rf.me) + " became leader?")
@@ -320,7 +322,7 @@ func (rf *Raft) ticker() {
 		// Check if a leader election should be started.
 
 		if rf.myState != Leader && atomic.LoadInt64(&rf.timeSinceBeat) > electionTime {
-			//fmt.Println(fmt.Sprint(rf.me) + " initializing vote")
+
 			rf.mu.Lock()
 			rf.myState = Candidate
 			rf.leader = -1
@@ -328,13 +330,13 @@ func (rf *Raft) ticker() {
 			rf.timeSinceBeat = 0
 			rf.currentTerm += 1
 			lastTerm := 0
-			if len(rf.log) > 0 {
-				lastTerm = rf.log[len(rf.log)-1].Term
+			if rf.commitIndex >= 0 {
+				lastTerm = rf.log[rf.commitIndex].Term
 			}
 			args := RequestVoteArgs{
 				rf.currentTerm,
 				rf.me,
-				len(rf.log) - 1, //double check if lastApplied, log length or commitIndex
+				rf.commitIndex, //double check if lastApplied, log length or commitIndex
 				lastTerm,
 			}
 			rf.mu.Unlock()
@@ -353,7 +355,7 @@ func (rf *Raft) ticker() {
 		}
 		// pause for a random amount of time between 50 and 350
 		// milliseconds.
-		ms := 50 + (rand.Int63() % 300)
+		ms := 50 + (rand.Int63() % 400)
 		rf.mu.Lock()
 		rf.timeSinceBeat += ms
 		rf.mu.Unlock()
@@ -398,7 +400,7 @@ func (rf *Raft) leadInit() {
 	rf.leader = rf.me
 	rf.myState = Leader
 	for idx := range rf.nextIndex {
-		if 0 < rf.lastApplied {
+		if 0 < rf.commitIndex {
 			rf.nextIndex[idx] = rf.commitIndex //double check if lastApplied or commitIndex
 		} else {
 			rf.nextIndex[idx] = 0
@@ -422,6 +424,10 @@ func min(a, b int) int {
 
 func (rf *Raft) heartBeat() {
 	for rf.myState == Leader {
+
+		//fmt.Println(fmt.Sprint(rf.me)+"s leader log: ", rf.log)
+		//fmt.Println(fmt.Sprint(rf.me)+"s leader log len: ", len(rf.log))
+		//fmt.Println(fmt.Sprint(rf.me)+"s leader commit: ", rf.commitIndex)
 		for peer := range rf.peers {
 			if peer == rf.me {
 				continue
@@ -449,6 +455,7 @@ func (rf *Raft) heartBeat() {
 				report.Command = rf.log[rf.commitIndex].Command
 				report.CommandIndex = rf.commitIndex + 1
 				report.CommandValid = true
+				//fmt.Println("Leader sending report: ", report)
 				rf.applyCh <- report
 				rf.lastApplied = rf.commitIndex
 			}
@@ -474,34 +481,41 @@ type AppendEntriesReply struct {
 
 // constants for sleep and timeouts
 const beatTime = 110
-const electionTime = 10 * beatTime
+const electionTime = 6 * beatTime
 
 // handle AppendEntries RPC
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-
+	//fmt.Println(fmt.Sprint(rf.me)+"s follower log: ", rf.log)
+	//fmt.Println(fmt.Sprint(rf.me)+"s follower log len: ", len(rf.log))
+	//fmt.Println(fmt.Sprint(rf.me)+"s follower commit: ", rf.commitIndex)
 	if args.Term < rf.currentTerm {
 		reply.Term = rf.currentTerm
+		fmt.Println(fmt.Sprint(rf.me) + " wrong term")
 		reply.Success = false
 
+		return
+	} else if args.LeaderCommit < rf.commitIndex {
+		reply.Term = reply.Term - 1
+		fmt.Println(fmt.Sprint(rf.me) + " leader is not up to date?!")
+		reply.Success = false
 		return
 	}
 	rf.currentTerm = args.Term
 	rf.leader = args.LeaderId
 	rf.myState = Follower
 	rf.timeSinceBeat = 0
-
 	if len(rf.log)-1 < args.PrevLogIndex {
 		reply.Term = rf.currentTerm
+		fmt.Println(fmt.Sprint(rf.me) + " log too short")
 		reply.Success = false
 		return
 	} else if args.PrevLogIndex == -1 {
-
 	} else if rf.log[args.PrevLogIndex].Term != args.PrevLogTerm {
 		//fmt.Println("Before ", rf.log)
 		if 1 < len(rf.log) {
-			rf.log = rf.log[:args.PrevLogIndex-1]
+			rf.log = rf.log[:args.PrevLogIndex]
 		} else {
 			rf.log = []LogEntry{}
 		}
@@ -514,6 +528,13 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	if len(args.Entries) == 0 {
 
 	} else if 0 < len(rf.log) && args.PrevLogIndex != len(rf.log)-1 {
+		if (args.PrevLogIndex+len(args.Entries)-1 < rf.commitIndex) && args.PrevLogIndex != -1 {
+			fmt.Println("This is a fuckup?!")
+
+			fmt.Println("has " + fmt.Sprint(rf.log[args.PrevLogIndex+1:]))
+			fmt.Println("given " + fmt.Sprint(args.Entries))
+
+		}
 		rf.log = append(rf.log[:args.PrevLogIndex+1], args.Entries...)
 	} else {
 		rf.log = append(rf.log, args.Entries...)
@@ -537,6 +558,7 @@ func (rf *Raft) SendAppendEntries(peer int) {
 	lastIndex := rf.nextIndex[peer] - 1
 	//fmt.Println("Leader's log: ", rf.log)
 	currentIndex := len(rf.log) - 1
+	sentTerm := rf.currentTerm
 	if rf.nextIndex[peer] > 0 {
 		lastTerm = rf.log[rf.nextIndex[peer]-1].Term
 	}
@@ -566,17 +588,21 @@ func (rf *Raft) SendAppendEntries(peer int) {
 	if !reply.Success {
 		//handle append follower problem
 		rf.mu.Lock()
-		if rf.currentTerm < reply.Term {
+		if rf.currentTerm < reply.Term || reply.Term < sentTerm {
 			rf.leader = -1
 			rf.votedFor = -1
 			rf.myState = Follower
 			rf.currentTerm = reply.Term
 			rf.mu.Unlock()
 			return
+		} else if sentTerm != rf.currentTerm {
+			rf.mu.Unlock()
+			return
 		} else {
-			//followers log not up to date
+			// followers log not up to date
 			// double check if this will interfere with dealing with lock
 			if rf.nextIndex[peer] <= 0 {
+
 				rf.mu.Unlock()
 				return
 			}
@@ -605,6 +631,7 @@ func (rf *Raft) commitLog() {
 		report.Command = rf.log[i].Command
 		report.CommandIndex = i + 1
 		report.CommandValid = true
+		//fmt.Println("Follower sending report: ", report)
 		rf.applyCh <- report
 		rf.lastApplied++
 	}
