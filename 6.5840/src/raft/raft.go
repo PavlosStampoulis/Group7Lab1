@@ -175,11 +175,11 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	if args.Term < rf.currentTerm {
+	if args.Term < rf.currentTerm || args.LastLogIndex < rf.lastApplied {
 		reply.Term = rf.currentTerm
 		reply.VoteGranted = false
 		return
-	} else if (rf.votedFor == -1 || rf.votedFor == args.CandidateId || rf.currentTerm < args.Term) && len(rf.log)-1 <= args.LastLogIndex {
+	} else if (rf.votedFor == -1 || rf.votedFor == args.CandidateId || rf.currentTerm < args.Term) && rf.lastApplied <= args.LastLogIndex {
 		if rf.lastApplied < 0 {
 			rf.timeSinceBeat = 0
 			rf.currentTerm = args.Term // already checked to be at least as big as our Term
@@ -329,7 +329,7 @@ func (rf *Raft) ticker() {
 			rf.currentTerm += 1
 			lastTerm := 0
 			if len(rf.log) > 0 {
-				lastTerm = rf.log[rf.commitIndex].Term
+				lastTerm = rf.log[len(rf.log)-1].Term
 			}
 			args := RequestVoteArgs{
 				rf.currentTerm,
@@ -444,6 +444,7 @@ func (rf *Raft) heartBeat() {
 			}
 			if rf.commitIndex < i {
 				rf.commitIndex++
+
 				report := ApplyMsg{}
 				report.Command = rf.log[rf.commitIndex].Command
 				report.CommandIndex = rf.commitIndex + 1
@@ -479,9 +480,11 @@ const electionTime = 10 * beatTime
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+
 	if args.Term < rf.currentTerm {
 		reply.Term = rf.currentTerm
 		reply.Success = false
+
 		return
 	}
 	rf.currentTerm = args.Term
@@ -525,6 +528,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	if rf.commitIndex > rf.lastApplied {
 		go rf.commitLog()
 	}
+
 }
 func (rf *Raft) SendAppendEntries(peer int) {
 	newLog := []LogEntry{} //make a log depending on peer's nextIndex
